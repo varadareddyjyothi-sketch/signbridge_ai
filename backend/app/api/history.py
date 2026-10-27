@@ -81,6 +81,7 @@ async def clear_history(
 # =========================================================================
 
 @router.get("/sentence", response_model=SentenceHistoryResponse)
+@router.get("/sentences", response_model=SentenceHistoryResponse)
 async def get_sentence_history(
     user_id: Optional[str] = Query(None, description="Optional user ID filter"),
     limit: int = Query(100, ge=1, le=500, description="Max records to retrieve"),
@@ -112,6 +113,7 @@ async def save_sentence_history(
         romanized_output=entry.romanized_output,
         selected_language=entry.selected_language,
         recognition_mode=entry.recognition_mode,
+        source_mode=entry.source_mode,
         user_id=effective_user_id
     )
     return SentenceHistoryEntry(**result)
@@ -128,6 +130,23 @@ async def clear_sentence_history(
     return {
         "success": True,
         "deleted_count": deleted_count,
+        "storage_mode": history_service.get_current_storage_mode()
+    }
+
+
+@router.delete("/sentence/{record_id}")
+async def delete_single_sentence(
+    record_id: str,
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
+    """Deletes an individual confirmed sentence record owned by the user."""
+    effective_user_id = current_user["id"] if current_user else None
+    deleted = history_service.delete_sentence_by_id(record_id=record_id, user_id=effective_user_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Sentence record not found or unauthorized to delete")
+    return {
+        "success": True,
+        "deleted_id": record_id,
         "storage_mode": history_service.get_current_storage_mode()
     }
 

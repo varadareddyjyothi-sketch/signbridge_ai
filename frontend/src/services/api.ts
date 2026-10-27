@@ -17,7 +17,9 @@ import type {
   UserProfile,
   AuthResponse,
   SentenceHistoryEntry,
-  SentenceHistoryResponse
+  SentenceHistoryResponse,
+  QuickPhraseCategory,
+  QuickPhraseListResponse
 } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
@@ -302,6 +304,29 @@ export const api = {
     return res.json();
   },
 
+  async getQuickPhraseCategories(): Promise<QuickPhraseCategory[]> {
+    const res = await fetchWithTimeout(`${API_BASE}/translate/categories`);
+    if (!res.ok) {
+      throw new Error(`Failed to fetch phrase categories: HTTP ${res.status}`);
+    }
+    return res.json();
+  },
+
+  async getQuickPhrases(category?: string, search?: string): Promise<QuickPhraseListResponse> {
+    const url = new URL(`${API_BASE}/translate/phrases`);
+    if (category && category !== 'all') {
+      url.searchParams.set('category', category);
+    }
+    if (search && search.trim()) {
+      url.searchParams.set('search', search.trim());
+    }
+    const res = await fetchWithTimeout(url.toString());
+    if (!res.ok) {
+      throw new Error(`Failed to fetch quick phrases: HTTP ${res.status}`);
+    }
+    return res.json();
+  },
+
   // =========================================================================
   // Authentication & Profile Services
   // =========================================================================
@@ -431,6 +456,7 @@ export const api = {
     romanized_output?: string;
     selected_language?: string;
     recognition_mode?: string;
+    source_mode?: 'camera_recognition' | 'quick_phrase' | string;
   }): Promise<SentenceHistoryEntry> {
     const res = await fetchWithTimeout(`${API_BASE}/history/sentence`, {
       method: 'POST',
@@ -458,6 +484,16 @@ export const api = {
     });
     if (!res.ok) {
       throw new Error(`Failed to clear sentence history: HTTP ${res.status}`);
+    }
+    return res.json();
+  },
+
+  async deleteSentence(id: string): Promise<{ success: boolean; deleted_id: string }> {
+    const res = await fetchWithTimeout(`${API_BASE}/history/sentence/${id}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) {
+      throw new Error(`Failed to delete sentence record: HTTP ${res.status}`);
     }
     return res.json();
   },

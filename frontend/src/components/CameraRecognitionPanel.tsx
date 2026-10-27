@@ -24,7 +24,12 @@ import {
   Undo2,
   CheckCircle2,
   Copy,
-  Check
+  Check,
+  MessageSquare,
+  Pause,
+  X,
+  HeartPulse,
+  BookOpen
 } from 'lucide-react';
 import { useWebcamHands } from '../hooks/useWebcamHands';
 import { api } from '../services/api';
@@ -35,7 +40,9 @@ import type {
   ModelStatus,
   PredictionResult,
   GestureVocabularyEntry,
-  SentenceTranslationResult
+  SentenceTranslationResult,
+  QuickPhraseCategory,
+  QuickPhraseItem
 } from '../types';
 
 export type RecognitionMode = 'pretrained' | 'custom_isl';
@@ -114,7 +121,8 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
   const [vocabSearch, setVocabSearch] = useState<string>('');
   const [vocabTypeFilter, setVocabTypeFilter] = useState<string>('all');
 
-  // Sentence Builder State (Phase 10: "Build Your Sentence")
+  // Sentence Builder State (Mode 1 & Mode 2)
+  const [activeSentenceMode, setActiveSentenceMode] = useState<'camera_recognition' | 'quick_phrase'>('camera_recognition');
   const [sentenceTokens, setSentenceTokens] = useState<string[]>([]);
   const [sentenceDraft, setSentenceDraft] = useState<string>('');
   const [sentenceTranslation, setSentenceTranslation] = useState<SentenceTranslationResult | null>(null);
@@ -123,8 +131,18 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
   const [sentenceSaveMessage, setSentenceSaveMessage] = useState<string | null>(null);
   const [copiedSentence, setCopiedSentence] = useState<boolean>(false);
   const [autoDeduplicateAdd, setAutoDeduplicateAdd] = useState<boolean>(false);
+  const [isAutoAddPaused, setIsAutoAddPaused] = useState<boolean>(false);
   const [sentenceOutputLang, setSentenceOutputLang] = useState<'all' | 'en' | 'te' | 'ro'>('all');
   const lastAutoAddedSignRef = useRef<string | null>(null);
+
+  // Quick Phrase Assistance State (Mode 2)
+  const [quickPhraseCategories, setQuickPhraseCategories] = useState<QuickPhraseCategory[]>([]);
+  const [quickPhrases, setQuickPhrases] = useState<QuickPhraseItem[]>([]);
+  const [selectedPhraseCategory, setSelectedPhraseCategory] = useState<string>('all');
+  const [phraseSearchQuery, setPhraseSearchQuery] = useState<string>('');
+  const [isLoadingPhrases, setIsLoadingPhrases] = useState<boolean>(false);
+  const [selectedQuickPhrase, setSelectedQuickPhrase] = useState<QuickPhraseItem | null>(null);
+  const [showQuickPhraseLibrary, setShowQuickPhraseLibrary] = useState<boolean>(false);
 
   // Raw and Smoothed Predictions
   const smoother = useMemo(() => new TemporalPredictionSmoother(5, 0.6), []);
@@ -320,10 +338,32 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
     });
   }, [stopCamera, smoother]);
 
-  // Sentence Builder Handlers (Phase 10)
+  // Load Quick Phrase Assistance Library (Mode 2)
+  const loadQuickPhrases = useCallback(async (cat?: string, search?: string) => {
+    setIsLoadingPhrases(true);
+    try {
+      const res = await api.getQuickPhrases(cat, search);
+      if (res) {
+        setQuickPhraseCategories(res.categories || []);
+        setQuickPhrases(res.phrases || []);
+      }
+    } catch (err) {
+      console.warn('Failed to load quick phrases:', err);
+    } finally {
+      setIsLoadingPhrases(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadQuickPhrases(selectedPhraseCategory, phraseSearchQuery);
+  }, [selectedPhraseCategory, phraseSearchQuery, loadQuickPhrases]);
+
+  // Sentence Builder Handlers (Mode 1 & Mode 2)
   const handleAddTokenToSentence = useCallback((tokenToAdd?: string) => {
     const token = tokenToAdd || smoothedRef.current?.stableLabel || lastAcceptedGestureRef.current?.label;
     if (!token) return;
+    setActiveSentenceMode('camera_recognition');
+    setSelectedQuickPhrase(null);
     setSentenceTokens((prev) => {
       const next = [...prev, token];
       api.translateSentence(next)
@@ -335,6 +375,48 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
           setSentenceDraft(next.join(' '));
         });
       return next;
+    });
+    setIsSentenceConfirmed(false);
+    setSentenceSaveMessage(null);
+  }, []);
+
+  const handleRemoveToken = useCallback((indexToRemove: number) => {
+    setSentenceTokens((prev) => {
+      const next = prev.filter((_, idx) => idx !== indexToRemove);
+      if (next.length > 0) {
+        api.translateSentence(next)
+          .then((res) => {
+            setSentenceTranslation(res);
+            setSentenceDraft(res.english);
+          })
+          .catch(() => {
+            setSentenceDraft(next.join(' '));
+          });
+      } else {
+        setSentenceTranslation(null);
+        setSentenceDraft('');
+      }
+      return next;
+    });
+    setActiveSentenceMode('camera_recognition');
+    setIsSentenceConfirmed(false);
+    setSentenceSaveMessage(null);
+  }, []);
+
+  const handleSelectQuickPhrase = useCallback((phrase: QuickPhraseItem) => {
+    setSelectedQuickPhrase(phrase);
+    setActiveSentenceMode('quick_phrase');
+    setSentenceDraft(phrase.english);
+    setSentenceTokens([phrase.id]);
+    setSentenceTranslation({
+      tokens: [phrase.id],
+      english: phrase.english,
+      telugu: phrase.telugu,
+      telugu_romanized: phrase.telugu_romanized,
+      sentence_intent: phrase.category,
+      punctuation: phrase.english.endsWith('?') ? '?' : phrase.english.endsWith('!') ? '!' : '.',
+      is_idiomatic_match: true,
+      source_mode: 'quick_phrase'
     });
     setIsSentenceConfirmed(false);
     setSentenceSaveMessage(null);
@@ -359,6 +441,7 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
       }
       return next;
     });
+    setActiveSentenceMode('camera_recognition');
     setIsSentenceConfirmed(false);
     setSentenceSaveMessage(null);
   }, []);
@@ -367,6 +450,8 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
     setSentenceTokens([]);
     setSentenceDraft('');
     setSentenceTranslation(null);
+    setSelectedQuickPhrase(null);
+    setActiveSentenceMode('camera_recognition');
     setIsSentenceConfirmed(false);
     setSentenceSaveMessage(null);
     lastAutoAddedSignRef.current = null;
@@ -375,6 +460,7 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
   const handleConfirmSentence = useCallback(async () => {
     const textToSave = sentenceDraft.trim() || sentenceTokens.join(' ');
     if (!textToSave && sentenceTokens.length === 0) return;
+    if (isSavingSentence || isSentenceConfirmed) return;
     setIsSavingSentence(true);
     setSentenceSaveMessage(null);
     try {
@@ -385,10 +471,15 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
         telugu_output: sentenceTranslation?.telugu || undefined,
         romanized_output: sentenceTranslation?.telugu_romanized || undefined,
         selected_language: sentenceOutputLang === 'all' ? 'en' : sentenceOutputLang,
-        recognition_mode: recognitionMode
+        recognition_mode: recognitionMode,
+        source_mode: activeSentenceMode
       });
       setIsSentenceConfirmed(true);
-      setSentenceSaveMessage('Sentence confirmed and saved to your history!');
+      setSentenceSaveMessage(
+        activeSentenceMode === 'quick_phrase'
+          ? 'Quick phrase confirmed and saved to history!'
+          : 'Camera sentence confirmed and saved to history!'
+      );
       onPredictionSaved?.();
       setTimeout(() => setSentenceSaveMessage(null), 4000);
     } catch (err: any) {
@@ -396,7 +487,7 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
     } finally {
       setIsSavingSentence(false);
     }
-  }, [sentenceDraft, sentenceTokens, sentenceTranslation, sentenceOutputLang, recognitionMode, onPredictionSaved]);
+  }, [sentenceDraft, sentenceTokens, sentenceTranslation, sentenceOutputLang, recognitionMode, activeSentenceMode, isSavingSentence, isSentenceConfirmed, onPredictionSaved]);
 
   const handleCopySentence = useCallback(() => {
     const textToCopy = sentenceDraft.trim() || sentenceTokens.join(' ');
@@ -1583,29 +1674,93 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
         </div>
 
         {/* =========================================================================
-            SECTION: Build Your Sentence (AI-Assisted Sentence Formation)
+            SECTION: Smart Sentence Formation & Conversation Mode (Mode 1 & Mode 2)
             ========================================================================= */}
         <div className="glass-panel" style={{ padding: '22px' }}>
-          {/* Header */}
+          {/* Header & Mode Indicators */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Languages size={20} color="#06b6d4" />
-              <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#ffffff' }}>Build Your Sentence</h3>
+              <div>
+                <h3 style={{ fontSize: '1.08rem', fontWeight: 700, color: '#ffffff', margin: 0 }}>
+                  Smart Sentence Formation & Conversation
+                </h3>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                  Grammar-aware bridge for English, reviewed Telugu script, and Romanized Telugu
+                </span>
+              </div>
             </div>
             
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span className={`badge ${isSentenceConfirmed ? 'badge-success' : 'badge-primary'}`} style={{ fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              {/* Active Mode Visual Badge */}
+              {activeSentenceMode === 'camera_recognition' ? (
+                <span
+                  className="badge badge-primary"
+                  style={{
+                    fontSize: '0.72rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    background: 'rgba(99, 102, 241, 0.2)',
+                    border: '1px solid #6366f1',
+                    color: '#a5b4fc',
+                    fontWeight: 600
+                  }}
+                  title="Sentences generated from active camera sign recognition"
+                >
+                  <Camera size={12} />
+                  <span>Mode 1: Live Sign Recognition</span>
+                </span>
+              ) : (
+                <span
+                  className="badge"
+                  style={{
+                    fontSize: '0.72rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    background: 'rgba(245, 158, 11, 0.2)',
+                    border: '1px solid #f59e0b',
+                    color: '#fcd34d',
+                    fontWeight: 600
+                  }}
+                  title="Sentence selected manually from verified quick phrase library"
+                >
+                  <MessageSquare size={12} />
+                  <span>Mode 2: Quick Phrase Selection</span>
+                </span>
+              )}
+
+              {/* Confirmation Status Badge */}
+              <span className={`badge ${isSentenceConfirmed ? 'badge-success' : 'badge-neutral'}`} style={{ fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
                 {isSentenceConfirmed ? <CheckCircle2 size={12} /> : null}
                 <span>{isSentenceConfirmed ? 'Confirmed Sentence' : 'Editable Draft'}</span>
               </span>
             </div>
           </div>
 
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '16px', lineHeight: 1.5 }}>
-            Combine recognized signs into fluent sentences. Review, edit, and confirm your sentence before speaking or saving.
-          </p>
+          {/* Emergency / Health Distinction Alert */}
+          {activeSentenceMode === 'quick_phrase' && selectedQuickPhrase?.is_emergency && (
+            <div style={{
+              padding: '10px 14px',
+              borderRadius: '8px',
+              background: 'rgba(239, 68, 68, 0.12)',
+              border: '1px solid rgba(239, 68, 68, 0.4)',
+              color: '#fca5a5',
+              fontSize: '0.78rem',
+              marginBottom: '14px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              <HeartPulse size={16} color="#f87171" />
+              <span>
+                <strong>Emergency / Medical Statement:</strong> Confirmed manually selected phrase. SignBridge AI never infers medical emergencies from uncertain camera gestures.
+              </span>
+            </div>
+          )}
 
-          {/* Latest Accepted Recognized Sign Banner */}
+          {/* Mode 1: Real-Time Recognized Sign Banner */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
@@ -1618,9 +1773,9 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
             flexWrap: 'wrap',
             gap: '8px'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#a5b4fc', fontWeight: 600 }}>
-                Latest Accepted Sign:
+                Live Stabilized Sign:
               </span>
               {lastAcceptedGesture?.label ? (
                 <span className="badge badge-primary" style={{ fontSize: '0.78rem', fontWeight: 700 }}>
@@ -1628,7 +1783,7 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
                 </span>
               ) : (
                 <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                  No gesture accepted yet — present a sign to the camera
+                  No sign confirmed yet — present a hand gesture to camera
                 </span>
               )}
             </div>
@@ -1641,27 +1796,61 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
               title="Append currently recognized sign to draft"
             >
               <Plus size={13} />
-              <span>+ Add to Sentence</span>
+              <span>+ Add Sign to Sentence</span>
             </button>
           </div>
 
-          {/* Original Recognized Signs Chips */}
+          {/* Original Recognized Signs Sequence Chips */}
           <div style={{ marginBottom: '14px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px', flexWrap: 'wrap', gap: '6px' }}>
-              <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600 }}>
-                Original Recognized Sign Sequence ({sentenceTokens.length} tokens)
-              </span>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', color: 'var(--text-secondary)', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={autoDeduplicateAdd}
-                  onChange={(e) => setAutoDeduplicateAdd(e.target.checked)}
-                  style={{ accentColor: '#6366f1' }}
-                />
-                <span>Auto-add newly held signs (deduplicated)</span>
-              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600 }}>
+                  Recognized Sign Sequence ({sentenceTokens.length} tokens)
+                </span>
+                {sentenceTranslation?.sentence_intent && (
+                  <span
+                    className="badge badge-neutral"
+                    style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: '#67e8f9', border: '1px solid rgba(6, 182, 212, 0.4)' }}
+                  >
+                    Intent: {sentenceTranslation.sentence_intent} {sentenceTranslation.punctuation}
+                  </span>
+                )}
+              </div>
+
+              {/* Auto-Add with Repetition & Repositioning Pause */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={autoDeduplicateAdd}
+                    onChange={(e) => setAutoDeduplicateAdd(e.target.checked)}
+                    style={{ accentColor: '#6366f1' }}
+                  />
+                  <span>Auto-add newly held signs</span>
+                </label>
+
+                {autoDeduplicateAdd && (
+                  <button
+                    onClick={() => setIsAutoAddPaused(!isAutoAddPaused)}
+                    className="btn btn-secondary"
+                    style={{
+                      padding: '2px 8px',
+                      fontSize: '0.68rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      color: isAutoAddPaused ? '#fbbf24' : '#34d399'
+                    }}
+                    title="Pause auto-adding while repositioning hands"
+                  >
+                    {isAutoAddPaused ? <Play size={10} /> : <Pause size={10} />}
+                    <span>{isAutoAddPaused ? 'Resume Auto-Add' : 'Pause for Hands'}</span>
+                  </button>
+                )}
+              </div>
             </div>
 
+            {/* Chips Container with Clickable Remove Buttons */}
             <div style={{
               minHeight: '44px',
               padding: '8px 12px',
@@ -1675,31 +1864,80 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
             }}>
               {sentenceTokens.length === 0 ? (
                 <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                  Sequence is empty. Present signs to camera or click "+ Add to Sentence".
+                  Sequence is empty. Hold signs steady in front of camera or select a Quick Phrase below.
                 </span>
               ) : (
                 sentenceTokens.map((token, idx) => (
                   <span
                     key={idx}
                     className="badge badge-primary"
-                    style={{ fontSize: '0.74rem', padding: '4px 8px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                    style={{
+                      fontSize: '0.74rem',
+                      padding: '4px 8px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      background: 'rgba(99, 102, 241, 0.25)',
+                      border: '1px solid rgba(99, 102, 241, 0.6)'
+                    }}
                   >
-                    <span>{token}</span>
+                    <span style={{ fontWeight: 600 }}>{token}</span>
                     <span style={{ opacity: 0.6, fontSize: '0.62rem' }}>#{idx + 1}</span>
+                    <button
+                      onClick={() => handleRemoveToken(idx)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#f87171',
+                        cursor: 'pointer',
+                        padding: '0 2px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        lineHeight: 1
+                      }}
+                      title={`Remove ${token} from draft`}
+                    >
+                      <X size={12} />
+                    </button>
                   </span>
                 ))
               )}
             </div>
+
+            {/* Disambiguation Alternative Chips */}
+            {sentenceTranslation?.disambiguation_options && sentenceTranslation.disambiguation_options.length > 0 && (
+              <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.72rem', color: '#fcd34d', fontWeight: 600 }}>Did you mean:</span>
+                {sentenceTranslation.disambiguation_options.map((opt, optIdx) => (
+                  <button
+                    key={optIdx}
+                    className="btn btn-secondary"
+                    onClick={() => {
+                      setSentenceDraft(opt.english);
+                      setSentenceTranslation((prev) => prev ? {
+                        ...prev,
+                        english: opt.english,
+                        telugu: opt.telugu,
+                        telugu_romanized: opt.telugu_romanized
+                      } : null);
+                    }}
+                    style={{ padding: '3px 8px', fontSize: '0.7rem' }}
+                  >
+                    <strong>{opt.label}:</strong> {opt.english}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Editable Sentence Draft */}
+          {/* Editable Sentence Draft Textarea */}
           <div style={{ marginBottom: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
               <label htmlFor="sentence-draft-input" style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600 }}>
-                Current Sentence Draft (Editable)
+                Sentence Draft (Review and edit before confirming)
               </label>
               <span style={{ fontSize: '0.7rem', color: isSentenceConfirmed ? '#34d399' : '#fbbf24' }}>
-                {isSentenceConfirmed ? '✓ Confirmed and Ready' : '✎ Review or edit text directly'}
+                {isSentenceConfirmed ? '✓ Confirmed and Ready' : '✎ Direct editing enabled'}
               </span>
             </div>
             
@@ -1710,7 +1948,7 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
                 setSentenceDraft(e.target.value);
                 setIsSentenceConfirmed(false);
               }}
-              placeholder="Your sentence draft will appear here. You can also type or edit words directly..."
+              placeholder="Your sentence draft will appear here. You can also edit words or add punctuation directly..."
               rows={2}
               style={{
                 width: '100%',
@@ -1728,7 +1966,7 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
             />
           </div>
 
-          {/* Language Selection Bar */}
+          {/* Output Language Selector Bar */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <Globe size={14} color="#a5b4fc" />
@@ -1759,7 +1997,7 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
               title="Undo the last sign added to the draft"
             >
               <Undo2 size={14} />
-              <span>Undo Last Word</span>
+              <span>Undo Last Sign</span>
             </button>
 
             {/* Clear Draft */}
@@ -1778,15 +2016,16 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
             <button
               className={`btn ${isSentenceConfirmed ? 'btn-secondary' : 'btn-primary'}`}
               onClick={handleConfirmSentence}
-              disabled={(!sentenceDraft.trim() && sentenceTokens.length === 0) || isSavingSentence}
+              disabled={(!sentenceDraft.trim() && sentenceTokens.length === 0) || isSavingSentence || isSentenceConfirmed}
               style={{
                 padding: '7px 16px',
                 fontSize: '0.78rem',
                 background: isSentenceConfirmed ? 'rgba(16, 185, 129, 0.2)' : undefined,
                 border: isSentenceConfirmed ? '1px solid rgba(16, 185, 129, 0.6)' : undefined,
-                color: isSentenceConfirmed ? '#34d399' : undefined
+                color: isSentenceConfirmed ? '#34d399' : undefined,
+                cursor: isSentenceConfirmed ? 'default' : 'pointer'
               }}
-              title="Confirm and persist sentence to database"
+              title={isSentenceConfirmed ? "Sentence confirmed and saved to history" : "Confirm and persist sentence to database"}
             >
               <CheckCircle2 size={14} />
               <span>{isSavingSentence ? 'Saving...' : isSentenceConfirmed ? 'Confirmed ✓' : 'Confirm Sentence'}</span>
@@ -1844,33 +2083,38 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
           {/* Multilingual Translation Outputs Display */}
           {sentenceTranslation && (
             <div style={{
-              padding: '14px',
+              padding: '16px',
               borderRadius: '10px',
               background: 'rgba(6, 182, 212, 0.05)',
               border: '1px solid rgba(6, 182, 212, 0.2)',
               display: 'flex',
               flexDirection: 'column',
-              gap: '10px',
-              marginBottom: '14px'
+              gap: '12px',
+              marginBottom: '16px'
             }}>
               {(sentenceOutputLang === 'all' || sentenceOutputLang === 'te') && (
                 <div>
-                  <div style={{ fontSize: '0.7rem', color: '#67e8f9', fontWeight: 600 }}>తెలుగు (Telugu Script)</div>
+                  <div style={{ fontSize: '0.72rem', color: '#67e8f9', fontWeight: 600, marginBottom: '2px' }}>
+                    తెలుగు (Reviewed Telugu Script)
+                  </div>
                   <div style={{
-                    fontSize: '1.25rem',
+                    fontSize: '1.35rem',
                     fontWeight: 700,
                     color: '#ffffff',
-                    fontFamily: '"Anek Telugu", "Noto Sans Telugu", sans-serif'
+                    fontFamily: '"Anek Telugu", "Noto Sans Telugu", sans-serif',
+                    lineHeight: 1.4
                   }}>
-                    {sentenceTranslation.telugu || '—'}
+                    {sentenceTranslation.telugu || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.95rem' }}>Translation unavailable</span>}
                   </div>
                 </div>
               )}
 
               {(sentenceOutputLang === 'all' || sentenceOutputLang === 'en') && (
                 <div>
-                  <div style={{ fontSize: '0.7rem', color: '#a5b4fc', fontWeight: 600 }}>English Translation</div>
-                  <div style={{ fontSize: '1rem', fontWeight: 600, color: '#e0e7ff' }}>
+                  <div style={{ fontSize: '0.72rem', color: '#a5b4fc', fontWeight: 600, marginBottom: '2px' }}>
+                    English Translation
+                  </div>
+                  <div style={{ fontSize: '1.05rem', fontWeight: 600, color: '#e0e7ff', lineHeight: 1.4 }}>
                     {sentenceTranslation.english || '—'}
                   </div>
                 </div>
@@ -1878,16 +2122,187 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
 
               {(sentenceOutputLang === 'all' || sentenceOutputLang === 'ro') && (
                 <div>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600 }}>Romanized Telugu</div>
-                  <div style={{ fontSize: '0.82rem', color: '#c7d2fe', fontStyle: 'italic' }}>
-                    "{sentenceTranslation.telugu_romanized || '—'}"
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '2px' }}>
+                    Romanized Telugu (Phonetic)
+                  </div>
+                  <div style={{ fontSize: '0.88rem', color: '#c7d2fe', fontStyle: 'italic' }}>
+                    {sentenceTranslation.telugu_romanized ? `"${sentenceTranslation.telugu_romanized}"` : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                  </div>
+                </div>
+              )}
+
+              {/* Lexical Meaning Breakdown (when composite tokens exist) */}
+              {sentenceTranslation.meaning_breakdown && sentenceTranslation.meaning_breakdown.length > 1 && (
+                <div style={{ borderTop: '1px dashed rgba(6, 182, 212, 0.2)', paddingTop: '10px' }}>
+                  <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '6px' }}>
+                    Sign-by-Sign Meaning Breakdown:
+                  </div>
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                    {sentenceTranslation.meaning_breakdown.map((item, bIdx) => (
+                      <span
+                        key={bIdx}
+                        className="badge badge-neutral"
+                        style={{ fontSize: '0.68rem', padding: '3px 8px' }}
+                      >
+                        <strong>{item.token}:</strong> {item.english} ({item.telugu})
+                      </span>
+                    ))}
                   </div>
                 </div>
               )}
             </div>
           )}
 
-          {/* ISL Technical Limitation Notice */}
+          {/* =========================================================================
+              MODE 2: Searchable Quick Phrase Assistance Library (Categories A-H)
+              ========================================================================= */}
+          <div id="quick-phrase-library-section" style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '16px', marginTop: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <MessageSquare size={16} color="#f59e0b" />
+                <h4 style={{ fontSize: '0.92rem', fontWeight: 700, color: '#ffffff', margin: 0 }}>
+                  Mode 2 — Quick Phrase Assistance Library
+                </h4>
+              </div>
+
+              <button
+                className="btn btn-secondary"
+                onClick={() => setShowQuickPhraseLibrary(!showQuickPhraseLibrary)}
+                style={{ padding: '4px 10px', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '5px' }}
+              >
+                <BookOpen size={13} color="#f59e0b" />
+                <span>{showQuickPhraseLibrary ? 'Hide Library' : 'Browse 63 Common Phrases (A-H)'}</span>
+                {showQuickPhraseLibrary ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+              </button>
+            </div>
+
+            <p style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', marginBottom: '12px', lineHeight: 1.4 }}>
+              Instantly pick from reviewed phrases for greetings, questions, basic needs, directions, education, and emergencies when you need to communicate quickly.
+            </p>
+
+            {showQuickPhraseLibrary && (
+              <div style={{
+                background: 'rgba(15, 23, 42, 0.5)',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: '10px',
+                padding: '14px',
+                marginTop: '10px'
+              }}>
+                {/* Search & Category Filter Pills */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '14px' }}>
+                  <div style={{ position: 'relative' }}>
+                    <Search size={14} color="#94a3b8" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
+                    <input
+                      type="text"
+                      value={phraseSearchQuery}
+                      onChange={(e) => setPhraseSearchQuery(e.target.value)}
+                      placeholder="Search phrases in English or Telugu (e.g. water, help, bus stop, ఎలా ఉన్నారు)..."
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px 8px 32px',
+                        borderRadius: '8px',
+                        background: 'rgba(255, 255, 255, 0.04)',
+                        border: '1px solid var(--border-subtle)',
+                        color: '#ffffff',
+                        fontSize: '0.8rem',
+                        outline: 'none'
+                      }}
+                    />
+                  </div>
+
+                  {/* Category Pills */}
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                    <button
+                      onClick={() => setSelectedPhraseCategory('all')}
+                      className={`btn ${selectedPhraseCategory === 'all' ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{ padding: '4px 9px', fontSize: '0.7rem' }}
+                    >
+                      All (63)
+                    </button>
+                    {quickPhraseCategories.map((cat) => (
+                      <button
+                        key={cat.id}
+                        onClick={() => setSelectedPhraseCategory(cat.id)}
+                        className={`btn ${selectedPhraseCategory === cat.id ? 'btn-primary' : 'btn-secondary'}`}
+                        style={{ padding: '4px 9px', fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                      >
+                        <span>{cat.icon}</span>
+                        <span>{cat.name} ({cat.count})</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Phrase Cards Grid */}
+                {isLoadingPhrases ? (
+                  <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+                    Loading reviewed phrases...
+                  </div>
+                ) : quickPhrases.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+                    No phrases found matching "{phraseSearchQuery}".
+                  </div>
+                ) : (
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                    gap: '10px',
+                    maxHeight: '340px',
+                    overflowY: 'auto',
+                    paddingRight: '4px'
+                  }}>
+                    {quickPhrases.map((phrase) => (
+                      <div
+                        key={phrase.id}
+                        style={{
+                          padding: '10px 12px',
+                          borderRadius: '8px',
+                          background: phrase.is_emergency ? 'rgba(239, 68, 68, 0.08)' : 'rgba(255, 255, 255, 0.03)',
+                          border: phrase.is_emergency ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid var(--border-subtle)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'space-between',
+                          gap: '6px'
+                        }}
+                      >
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                            <span style={{ fontSize: '0.66rem', textTransform: 'uppercase', color: phrase.is_emergency ? '#f87171' : '#38bdf8', fontWeight: 600 }}>
+                              {phrase.is_emergency ? '🚨 Emergency' : phrase.category}
+                            </span>
+                            <span className="badge badge-neutral" style={{ fontSize: '0.62rem' }}>Verified</span>
+                          </div>
+                          <div style={{ fontSize: '0.88rem', fontWeight: 600, color: '#ffffff', marginBottom: '2px' }}>
+                            {phrase.english}
+                          </div>
+                          <div style={{ fontSize: '0.84rem', color: '#67e8f9', fontFamily: '"Anek Telugu", "Noto Sans Telugu", sans-serif' }}>
+                            {phrase.telugu}
+                          </div>
+                          <div style={{ fontSize: '0.72rem', color: '#c7d2fe', fontStyle: 'italic' }}>
+                            "{phrase.telugu_romanized}"
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '6px' }}>
+                          <button
+                            className="btn btn-secondary"
+                            onClick={() => handleSelectQuickPhrase(phrase)}
+                            style={{ padding: '4px 10px', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                            title="Select phrase to communicate immediately"
+                          >
+                            <MessageSquare size={12} color="#f59e0b" />
+                            <span>Select Phrase</span>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Technical Transparency Notice */}
           <div style={{
             fontSize: '0.72rem',
             color: 'var(--text-muted)',
@@ -1895,9 +2310,10 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
             padding: '8px 12px',
             background: 'rgba(255, 255, 255, 0.02)',
             borderRadius: '6px',
-            borderLeft: '3px solid #6366f1'
+            borderLeft: '3px solid #6366f1',
+            marginTop: '16px'
           }}>
-            <strong>Notice on ISL Sentences:</strong> SignBridge AI combines recognized static ISL signs into readable sentences using an automated grammar bridge. Continuous dynamic ISL signing with complex non-manual markers (facial expressions, body pose) is under active model development.
+            <strong>Notice on ISL Sentence Recognition:</strong> SignBridge AI generates sentences either from genuinely recognized signs (Mode 1) or confirmed manual phrase selection (Mode 2). Unsupported signs are presented with transparent uncertainty rather than fabricated translations.
           </div>
         </div>
 

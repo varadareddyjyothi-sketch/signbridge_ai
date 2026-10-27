@@ -107,6 +107,7 @@ def init_local_db():
                 romanized_output TEXT,
                 selected_language TEXT NOT NULL,
                 recognition_mode TEXT NOT NULL,
+                source_mode TEXT DEFAULT 'camera_recognition',
                 created_at TEXT NOT NULL
             );
         """)
@@ -120,6 +121,11 @@ def init_local_db():
             cursor.execute("ALTER TABLE profiles ADD COLUMN preferred_language TEXT DEFAULT 'en';")
         if "updated_at" not in profile_cols:
             cursor.execute("ALTER TABLE profiles ADD COLUMN updated_at TEXT;")
+
+        cursor.execute("PRAGMA table_info(sentence_history);")
+        sent_cols = [col[1] for col in cursor.fetchall()]
+        if "source_mode" not in sent_cols:
+            cursor.execute("ALTER TABLE sentence_history ADD COLUMN source_mode TEXT DEFAULT 'camera_recognition';")
 
         # Indices
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);")
@@ -410,23 +416,57 @@ def save_sentence_record(
     romanized_output: Optional[str] = None,
     selected_language: str = "en",
     recognition_mode: str = "custom_isl",
+    source_mode: str = "camera_recognition",
     user_id: Optional[str] = None
 ) -> Dict[str, Any]:
-    """Inserts a confirmed sentence record into persistent storage."""
+    """Inserts a confirmed sentence record into persistent storage with duplicate suppression."""
     init_local_db()
-    record_id = str(uuid.uuid4())
     now_iso = datetime.now(timezone.utc).isoformat()
 
     with get_db_connection() as conn:
         cursor = conn.cursor()
+
+        # Idempotency / duplicate protection: check if identical record was saved within the last 5 seconds
+        if user_id:
+            cursor.execute("""
+                SELECT id, user_id, original_signs, confirmed_sentence, english_output,
+                       telugu_output, romanized_output, selected_language, recognition_mode,
+                       COALESCE(source_mode, 'camera_recognition') AS source_mode, created_at
+                FROM sentence_history
+                WHERE user_id = ? AND confirmed_sentence = ?
+                ORDER BY created_at DESC LIMIT 1
+            """, (user_id, confirmed_sentence))
+        else:
+            cursor.execute("""
+                SELECT id, user_id, original_signs, confirmed_sentence, english_output,
+                       telugu_output, romanized_output, selected_language, recognition_mode,
+                       COALESCE(source_mode, 'camera_recognition') AS source_mode, created_at
+                FROM sentence_history
+                WHERE (user_id IS NULL OR user_id = '') AND confirmed_sentence = ?
+                ORDER BY created_at DESC LIMIT 1
+            """, (confirmed_sentence,))
+
+        recent = cursor.fetchone()
+        if recent:
+            recent_dict = dict(recent)
+            try:
+                recent_dt = datetime.fromisoformat(recent_dict["created_at"])
+                current_dt = datetime.fromisoformat(now_iso)
+                if abs((current_dt - recent_dt).total_seconds()) < 5.0:
+                    recent_dict["storage_source"] = "local_sqlite"
+                    return recent_dict
+            except Exception:
+                pass
+
+        record_id = str(uuid.uuid4())
         cursor.execute("""
             INSERT INTO sentence_history (
                 id, user_id, original_signs, confirmed_sentence, english_output,
-                telugu_output, romanized_output, selected_language, recognition_mode, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                telugu_output, romanized_output, selected_language, recognition_mode, source_mode, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             record_id, user_id, original_signs, confirmed_sentence, english_output,
-            telugu_output, romanized_output, selected_language, recognition_mode, now_iso
+            telugu_output, romanized_output, selected_language, recognition_mode, source_mode, now_iso
         ))
         conn.commit()
 
@@ -440,6 +480,7 @@ def save_sentence_record(
         "romanized_output": romanized_output,
         "selected_language": selected_language,
         "recognition_mode": recognition_mode,
+        "source_mode": source_mode,
         "created_at": now_iso,
         "storage_source": "local_sqlite"
     }
@@ -453,7 +494,8 @@ def fetch_sentence_records(user_id: Optional[str] = None, limit: int = 100) -> L
         if user_id:
             cursor.execute("""
                 SELECT id, user_id, original_signs, confirmed_sentence, english_output,
-                       telugu_output, romanized_output, selected_language, recognition_mode, created_at
+                       telugu_output, romanized_output, selected_language, recognition_mode,
+                       COALESCE(source_mode, 'camera_recognition') AS source_mode, created_at
                 FROM sentence_history
                 WHERE user_id = ?
                 ORDER BY created_at DESC
@@ -462,7 +504,8 @@ def fetch_sentence_records(user_id: Optional[str] = None, limit: int = 100) -> L
         else:
             cursor.execute("""
                 SELECT id, user_id, original_signs, confirmed_sentence, english_output,
-                       telugu_output, romanized_output, selected_language, recognition_mode, created_at
+                       telugu_output, romanized_output, selected_language, recognition_mode,
+                       COALESCE(source_mode, 'camera_recognition') AS source_mode, created_at
                 FROM sentence_history
                 ORDER BY created_at DESC
                 LIMIT ?
@@ -484,3 +527,18 @@ def clear_sentence_records(user_id: Optional[str] = None) -> int:
         deleted_count = cursor.rowcount
         conn.commit()
     return deleted_count
+
+
+def delete_sentence_record_by_id(record_id: str, user_id: Optional[str] = None) -> bool:
+    """Deletes a specific confirmed sentence record if owned by user or anonymous."""
+    init_local_db()
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        if user_id:
+            cursor.execute("DELETE FROM sentence_history WHERE id = ? AND user_id = ?", (record_id, user_id))
+        else:
+            cursor.execute("DELETE FROM sentence_history WHERE id = ?", (record_id,))
+        deleted = cursor.rowcount > 0
+        conn.commit()
+    return deleted
+

@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Navbar } from './components/Navbar';
-import { LandingHero } from './components/LandingHero';
+import { Navbar, type AppNavTab } from './components/Navbar';
+import { HomeScreen } from './components/HomeScreen';
 import { CameraRecognitionPanel } from './components/CameraRecognitionPanel';
 import { TwoWaySpeechPanel } from './components/TwoWaySpeechPanel';
-import { DatasetStudio } from './components/DatasetStudio';
-import { GestureManagement } from './components/GestureManagement';
+import { AdminToolsPanel } from './components/AdminToolsPanel';
 import { HistoryLog } from './components/HistoryLog';
 import { ISLGuide } from './components/ISLGuide';
 import { AuthModal } from './components/AuthModal';
@@ -13,10 +12,9 @@ import { api } from './services/api';
 import type { HealthStatus, ModelStatus, UserProfile } from './types';
 
 export function App() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'studio' | 'history' | 'guide' | 'gestures'>('dashboard');
+  const [activeTab, setActiveTab] = useState<AppNavTab>('home');
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [modelStatus, setModelStatus] = useState<ModelStatus | null>(null);
-  const [showHero, setShowHero] = useState<boolean>(true);
   const [selectedStudioClassId, setSelectedStudioClassId] = useState<string | null>(null);
   const [practiceTargetSign, setPracticeTargetSign] = useState<{ id: string; name: string } | null>(null);
 
@@ -58,15 +56,27 @@ export function App() {
     return () => clearInterval(interval);
   }, [refreshSystemStatus]);
 
-  const handleNavigateToCollect = (classId: string) => {
-    setSelectedStudioClassId(classId);
-    setActiveTab('studio');
+  const handleStartCommunicating = () => {
+    setActiveTab('recognition');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleOpenQuickPhrases = () => {
+    setActiveTab('recognition');
+    setTimeout(() => {
+      const el = document.getElementById('quick-phrase-library-section');
+      if (el) el.scrollIntoView({ behavior: 'smooth' });
+    }, 150);
+  };
+
+  const handleExploreGuide = () => {
+    setActiveTab('guide');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handlePractiseSign = (signId: string, signName: string) => {
     setPracticeTargetSign({ id: signId, name: signName });
-    setActiveTab('dashboard');
-    setShowHero(false);
+    setActiveTab('recognition');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -100,51 +110,54 @@ export function App() {
 
       {/* Main Content Area */}
       <main className="container" style={{ flex: 1, padding: '24px 20px' }}>
-        {activeTab === 'dashboard' && (
+        {/* View 1: Home Screen */}
+        {activeTab === 'home' && (
+          <HomeScreen
+            onStartCommunicating={handleStartCommunicating}
+            onOpenQuickPhrases={handleOpenQuickPhrases}
+            onExploreGuide={handleExploreGuide}
+            modelStatus={modelStatus}
+            health={health}
+          />
+        )}
+
+        {/* View 2: Live Recognition & Sentence Builder */}
+        {activeTab === 'recognition' && (
           <div>
-            {showHero && (
-              <LandingHero
-                onStartClick={() => setShowHero(false)}
-                classesCount={modelStatus?.classes_count || 10}
-              />
-            )}
+            <CameraRecognitionPanel
+              modelStatus={modelStatus}
+              practiceTargetSign={practiceTargetSign}
+              onClearPracticeTarget={() => setPracticeTargetSign(null)}
+              onPredictionSaved={refreshSystemStatus}
+              onNavigateToStudio={() => {
+                setSelectedStudioClassId(null);
+                setActiveTab('admin');
+              }}
+              onNavigateToManageGestures={() => setActiveTab('admin')}
+            />
 
-            <div style={{ marginTop: showHero ? '10px' : '0' }}>
-              <CameraRecognitionPanel
-                modelStatus={modelStatus}
-                practiceTargetSign={practiceTargetSign}
-                onClearPracticeTarget={() => setPracticeTargetSign(null)}
-                onPredictionSaved={refreshSystemStatus}
-                onNavigateToStudio={() => setActiveTab('studio')}
-                onNavigateToManageGestures={() => setActiveTab('gestures')}
-              />
-
-              {/* Two-Way Audio Bridge */}
-              <TwoWaySpeechPanel />
-            </div>
+            {/* Two-Way Communication Bridge */}
+            <TwoWaySpeechPanel />
           </div>
         )}
 
-        {activeTab === 'gestures' && (
-          <GestureManagement
-            onNavigateToCollect={handleNavigateToCollect}
-            onModelUpdated={refreshSystemStatus}
-          />
-        )}
-
-        {activeTab === 'studio' && (
-          <DatasetStudio
-            initialClassId={selectedStudioClassId || undefined}
-            onModelRetrained={refreshSystemStatus}
-          />
-        )}
-
-        {activeTab === 'history' && <HistoryLog />}
-
+        {/* View 3: ISL Guide */}
         {activeTab === 'guide' && (
           <ISLGuide
             onPractiseSign={handlePractiseSign}
             activeModelClasses={modelStatus?.classes || []}
+          />
+        )}
+
+        {/* View 4: Conversation History & Excel Export */}
+        {activeTab === 'history' && <HistoryLog />}
+
+        {/* View 5: Admin & Developer Studio (Cleanly Isolated) */}
+        {activeTab === 'admin' && (
+          <AdminToolsPanel
+            modelStatus={modelStatus}
+            onModelRetrained={refreshSystemStatus}
+            selectedClassId={selectedStudioClassId || undefined}
           />
         )}
       </main>
@@ -180,7 +193,7 @@ export function App() {
       >
         <div className="container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
           <div>
-            <strong style={{ color: 'var(--text-primary)' }}>SignBridge AI</strong> — Indian Sign Language Bridge
+            <strong style={{ color: 'var(--text-primary)' }}>SignBridge AI</strong> — Indian Sign Language Communication Platform
           </div>
           <div>
             Powered by MediaPipe Hands & Scikit-Learn Random Forest

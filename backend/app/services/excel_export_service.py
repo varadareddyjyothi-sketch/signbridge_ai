@@ -124,7 +124,8 @@ class ExcelExportService:
             "Telugu Script Output",
             "Romanized Telugu Output",
             "Selected Language",
-            "Recognition Mode"
+            "Recognition Mode",
+            "Source Mode"
         ]
 
         for col_idx, h in enumerate(sentence_headers, start=1):
@@ -137,9 +138,11 @@ class ExcelExportService:
         if not sentences:
             empty_cell = ws_sentences.cell(row=5, column=1, value="No confirmed sentences logged yet.")
             empty_cell.font = italic_muted_font
-            ws_sentences.merge_cells("A5:I5")
+            ws_sentences.merge_cells("A5:J5")
         else:
             for r_idx, item in enumerate(sentences, start=5):
+                source_mode_raw = item.get("source_mode", "camera_recognition")
+                source_mode_display = "Quick Phrase Selection" if source_mode_raw == "quick_phrase" else "Camera Recognition"
                 row_data = [
                     item.get("id", ""),
                     item.get("created_at", ""),
@@ -149,7 +152,8 @@ class ExcelExportService:
                     item.get("telugu_output", "") or "",
                     item.get("romanized_output", "") or "",
                     item.get("selected_language", "en"),
-                    item.get("recognition_mode", "custom_isl")
+                    item.get("recognition_mode", "custom_isl"),
+                    source_mode_display
                 ]
                 for c_idx, val in enumerate(row_data, start=1):
                     cell = ws_sentences.cell(row=r_idx, column=c_idx, value=sanitize_excel_value(val))

@@ -46,6 +46,7 @@ class SentenceHistoryEntry(BaseModel):
     romanized_output: Optional[str] = None
     selected_language: str = "en"
     recognition_mode: str = "custom_isl"
+    source_mode: str = "camera_recognition"
     created_at: str
     storage_source: Optional[str] = "local_sqlite"
 
@@ -58,6 +59,7 @@ class SentenceHistoryCreateRequest(BaseModel):
     romanized_output: Optional[str] = None
     selected_language: str = Field(default="en", description="Output language ('en', 'te', 'ro')")
     recognition_mode: str = Field(default="custom_isl", description="'custom_isl' or 'pretrained'")
+    source_mode: str = Field(default="camera_recognition", description="'camera_recognition' or 'quick_phrase'")
     user_id: Optional[str] = None
 
     @field_validator("original_signs", mode="before")

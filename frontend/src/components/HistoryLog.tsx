@@ -105,6 +105,16 @@ export const HistoryLog: React.FC = () => {
     ttsService.speak(text, lang);
   };
 
+  const handleDeleteSingleSentence = async (recordId: string) => {
+    if (!window.confirm('Are you sure you want to delete this saved sentence record?')) return;
+    try {
+      await api.deleteSentence(recordId);
+      setSentences((prev) => prev.filter((item) => item.id !== recordId));
+    } catch (err: any) {
+      alert(`Failed to delete record: ${err.message || 'Error'}`);
+    }
+  };
+
   const currentStorageMode = activeTab === 'sentences' ? sentenceStorageMode : gestureStorageMode;
 
   return (
@@ -254,8 +264,8 @@ export const HistoryLog: React.FC = () => {
                     <td style={{ padding: '14px 18px', color: '#ffffff', fontWeight: 600, fontSize: '0.95rem' }}>
                       {row.confirmed_sentence}
                     </td>
-                    <td style={{ padding: '14px 18px', color: '#67e8f9', fontWeight: 600, fontFamily: '"Anek Telugu", "Noto Sans Telugu", sans-serif' }}>
-                      {row.telugu_output || '—'}
+                    <td style={{ padding: '14px 18px', color: row.telugu_output ? '#67e8f9' : 'var(--text-muted)', fontWeight: row.telugu_output ? 600 : 400, fontFamily: '"Anek Telugu", "Noto Sans Telugu", sans-serif' }}>
+                      {row.telugu_output || <span style={{ fontStyle: 'italic', fontSize: '0.8rem' }}>Translation unavailable</span>}
                     </td>
                     <td style={{ padding: '14px 18px', color: '#c7d2fe', fontStyle: 'italic', fontSize: '0.82rem' }}>
                       {row.romanized_output || '—'}
@@ -277,6 +287,14 @@ export const HistoryLog: React.FC = () => {
                           title="Speak sentence"
                         >
                           <Volume2 size={13} color="#818cf8" />
+                        </button>
+                        <button
+                          className="btn btn-secondary"
+                          onClick={() => handleDeleteSingleSentence(row.id)}
+                          style={{ padding: '5px 8px', fontSize: '0.75rem', color: '#f87171' }}
+                          title="Delete this sentence record"
+                        >
+                          <Trash2 size={13} />
                         </button>
                       </div>
                     </td>

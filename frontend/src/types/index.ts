@@ -113,12 +113,59 @@ export interface ModelVersionEntry {
   note?: string;
 }
 
+export interface MeaningBreakdownItem {
+  token: string;
+  supported: boolean;
+  gloss: string;
+  role: string;
+  english: string;
+  telugu: string;
+  telugu_romanized: string;
+}
+
+export interface DisambiguationOption {
+  label: string;
+  english: string;
+  telugu: string;
+  telugu_romanized: string;
+}
+
 export interface SentenceTranslationResult {
   tokens: string[];
   english: string;
   telugu: string;
   telugu_romanized: string;
+  sentence_intent?: string;
+  punctuation?: string;
   is_idiomatic_match: boolean;
+  meaning_breakdown?: MeaningBreakdownItem[];
+  source_mode?: 'camera_recognition' | 'quick_phrase';
+  disambiguation_options?: DisambiguationOption[];
+}
+
+export interface QuickPhraseCategory {
+  id: string;
+  name: string;
+  icon: string;
+  count: number;
+}
+
+export interface QuickPhraseItem {
+  id: string;
+  category: string;
+  english: string;
+  telugu: string;
+  telugu_romanized: string;
+  is_emergency: boolean;
+  verified: boolean;
+  notes?: string;
+  source_mode: 'quick_phrase';
+}
+
+export interface QuickPhraseListResponse {
+  categories: QuickPhraseCategory[];
+  phrases: QuickPhraseItem[];
+  total: number;
 }
 
 export interface UserProfile {
@@ -145,6 +192,7 @@ export interface SentenceHistoryEntry {
   romanized_output?: string | null;
   selected_language: string;
   recognition_mode: string;
+  source_mode?: 'camera_recognition' | 'quick_phrase' | string;
   created_at: string;
   storage_source?: 'supabase' | 'local_sqlite' | string;
 }
@@ -155,5 +203,6 @@ export interface SentenceHistoryResponse {
   storage_mode: 'supabase' | 'local_sqlite' | string;
   cloud_connected: boolean;
 }
+
 
 

@@ -14,7 +14,8 @@ from backend.app.database.local_storage import (
     clear_history_records,
     save_sentence_record,
     fetch_sentence_records,
-    clear_sentence_records
+    clear_sentence_records,
+    delete_sentence_record_by_id
 )
 
 
@@ -119,6 +120,7 @@ class HistoryService:
         romanized_output: Optional[str] = None,
         selected_language: str = "en",
         recognition_mode: str = "custom_isl",
+        source_mode: str = "camera_recognition",
         user_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """Saves an explicitly confirmed sentence to persistent history."""
@@ -137,6 +139,7 @@ class HistoryService:
                     "romanized_output": romanized_output,
                     "selected_language": selected_language,
                     "recognition_mode": recognition_mode,
+                    "source_mode": source_mode,
                     "created_at": now_iso
                 }
                 res = client.table("sentence_history").insert(payload).execute()
@@ -155,6 +158,7 @@ class HistoryService:
             romanized_output=romanized_output,
             selected_language=selected_language,
             recognition_mode=recognition_mode,
+            source_mode=source_mode,
             user_id=user_id
         )
 
@@ -195,6 +199,22 @@ class HistoryService:
                 print(f"[HistoryService] Supabase sentence delete failed ({e}), falling back to SQLite.")
 
         return clear_sentence_records(user_id=user_id)
+
+    def delete_sentence_by_id(self, record_id: str, user_id: Optional[str] = None) -> bool:
+        """Deletes a specific confirmed sentence record."""
+        client = get_supabase_client()
+        if client is not None:
+            try:
+                query = client.table("sentence_history").delete().eq("id", record_id)
+                if user_id:
+                    query = query.eq("user_id", user_id)
+                res = query.execute()
+                if res.data and len(res.data) > 0:
+                    return True
+            except Exception as e:
+                print(f"[HistoryService] Supabase delete single failed ({e}), falling back to SQLite.")
+
+        return delete_sentence_record_by_id(record_id=record_id, user_id=user_id)
 
 
 history_service = HistoryService()
