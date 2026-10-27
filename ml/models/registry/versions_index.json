@@ -1,0 +1,25 @@
+[
+  {
+    "version": "v1.0.0",
+    "model_filename": "signbridge_rf_v1.0.0.joblib",
+    "metadata_filename": "metadata_v1.0.0.json",
+    "test_accuracy": 0.8278688524590164,
+    "total_samples": 607,
+    "classes": [
+      "ISL_1",
+      "ISL_2",
+      "ISL_3",
+      "ISL_4",
+      "ISL_5",
+      "ISL_FIST",
+      "ISL_NO_INDEX",
+      "ISL_OK",
+      "ISL_PEACE_VICTORY",
+      "ISL_YES_THUMBS_UP"
+    ],
+    "classes_count": 10,
+    "created_at": "2026-10-26T15:56:00.232097+00:00",
+    "is_active": true,
+    "note": "Initial baseline model trained on verified ISL dataset."
+  }
+]
