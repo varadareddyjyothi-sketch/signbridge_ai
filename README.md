@@ -238,9 +238,97 @@ SignBridge AI works out of the box with embedded SQLite. To connect Supabase:
 
 ---
 
+## 🚀 Production Deployment on DeployXa
+
+SignBridge AI is fully configured for production deployment on **[DeployXa](https://deployxa.com)**, supporting both **Single-Container Full-Stack Deployment** (recommended) and **Multi-Service Deployment**.
+
+### Architecture Overview
+
+```
+                      DeployXa HTTPS Edge Router
+                                   │
+                                   ▼
+                   FastAPI Production Service (Port $PORT)
+                   ├── GET / ───────────────► React 19 SPA (frontend/dist)
+                   ├── GET /assets/* ───────► Bundled JS / CSS
+                   ├── GET /models, /wasm ──► MediaPipe Vision Edge Tasks
+                   ├── GET /health ─────────► Health & Model Status
+                   └── POST /predict/* ─────► Random Forest + Dual-Hand Classifier
+```
+
+### Option A: One-Click Container Deployment (Recommended)
+
+DeployXa automatically detects the root `Dockerfile` and builds a secure multi-stage container that compiles the Vite/React frontend and runs the FastAPI inference server.
+
+1. **Connect Repository**:
+   - In DeployXa dashboard, select **New Project** and connect `https://github.com/varadareddyjyothi-sketch/signbridge_ai.git`.
+2. **Environment Variables**:
+   Configure the following in the DeployXa Dashboard:
+   | Variable | Value | Description |
+   |---|---|---|
+   | `ENVIRONMENT` | `production` | Enables production security & logging |
+   | `ALLOWED_ORIGINS` | `*` (or your DeployXa domain) | Configures CORS for browser clients |
+   | `CONFIDENCE_THRESHOLD` | `0.65` | Anti-hallucination rejection threshold |
+   | `SUPABASE_URL` | *(optional)* | Supabase project URL (falls back to SQLite) |
+   | `SUPABASE_PUBLISHABLE_KEY` | *(optional)* | Supabase anon publishable key |
+3. **Deploy**:
+   - Click **Deploy**. DeployXa will automatically run the multi-stage Docker build, execute health checks on `/health`, and assign a secure HTTPS URL.
+
+### Option B: Separate Frontend & Backend Services
+
+If deploying frontend and backend as separate services on DeployXa:
+
+#### 1. Backend Service:
+- **Root Directory**: `.`
+- **Build Command**: `pip install -r requirements.txt`
+- **Start Command**: `uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT`
+- **Health Check Path**: `/health`
+- **Environment Variables**:
+  - `HOST`: `0.0.0.0`
+  - `ENVIRONMENT`: `production`
+  - `ALLOWED_ORIGINS`: `https://your-frontend.deployxa.app`
+
+#### 2. Frontend Service:
+- **Root Directory**: `frontend`
+- **Build Command**: `npm run build`
+- **Output Directory**: `dist`
+- **Environment Variables**:
+  - `VITE_API_BASE_URL`: `https://your-backend.deployxa.app`
+
+---
+
+## 🔒 Post-Deployment Verification & Smoke Tests
+
+After deploying on DeployXa, verify the live deployment:
+
+1. **Health Endpoint**:
+   ```bash
+   curl -s https://your-app.deployxa.app/health
+   ```
+   Expected response:
+   ```json
+   {
+     "status": "healthy",
+     "app_name": "SignBridge AI",
+     "version": "1.0.0",
+     "environment": "production",
+     "model_status": "evaluated",
+     "model_classes_count": 15,
+     "storage_mode": "sqlite_local",
+     "supabase_configured": false,
+     "timestamp": "..."
+   }
+   ```
+2. **Swagger Documentation**:
+   Visit `https://your-app.deployxa.app/docs` to inspect and test all 8 REST APIs interactively.
+3. **Webcam & Camera Permissions**:
+   Because DeployXa serves the site over HTTPS, the browser's WebRTC camera access API (`navigator.mediaDevices.getUserMedia`) is fully supported without security restrictions.
+
+---
+
 ## ⚠️ Known Limitations & Scope Transparency
 
-- **Static Handshape Classification**: Recognizes static hand shapes. Does not translate continuous trajectory movements or multi-handed compound sentences.
+- **Static Handshape Classification**: Recognizes static single-hand and dual-hand shapes (15 verified classes). Does not translate continuous trajectory movements or multi-handed compound sentences.
 - **Lighting & Camera Quality**: MediaPipe landmarks require reasonable hand visibility and contrast against the background.
 - **ISL Regional Variations**: Handshapes are aligned with ISLRTC standard numbers and affirmations; regional ISL dialects may use alternative forms.
 
@@ -252,4 +340,5 @@ SignBridge AI works out of the box with embedded SQLite. To connect Supabase:
 - [ ] Two-handed gesture classification for compound ISL phrases.
 - [ ] User profile customization for personal gesture shortcuts.
 - [ ] Offline PWA deployment with WebAssembly model execution.
+
 

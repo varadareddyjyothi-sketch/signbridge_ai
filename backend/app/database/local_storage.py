@@ -16,7 +16,7 @@ from backend.app.config import settings
 
 def get_db_connection() -> sqlite3.Connection:
     os.makedirs(os.path.dirname(settings.SQLITE_DB_PATH), exist_ok=True)
-    conn = sqlite3.connect(settings.SQLITE_DB_PATH)
+    conn = sqlite3.connect(settings.SQLITE_DB_PATH, timeout=15.0)
     conn.row_factory = sqlite3.Row
     return conn
 

@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 from backend.app.config import settings
 
-REGISTRY_DIR = os.path.join("ml", "models", "registry")
+REGISTRY_DIR = str(settings.BASE_DIR / "ml" / "models" / "registry")
 INDEX_FILE = os.path.join(REGISTRY_DIR, "versions_index.json")
 
 

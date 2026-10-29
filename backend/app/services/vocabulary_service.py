@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 from backend.app.config import settings
 
-VOCABULARY_PATH = os.path.join("ml", "vocabulary", "gesture_vocabulary.json")
+VOCABULARY_PATH = str(settings.BASE_DIR / "ml" / "vocabulary" / "gesture_vocabulary.json")
 DATASET_PATH = settings.DATASET_PATH
 MIN_SAMPLES_FOR_TRAINING = 15
 
