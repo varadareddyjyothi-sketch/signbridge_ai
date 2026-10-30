@@ -58,9 +58,12 @@ export interface UseWebcamHandsReturn {
   cameraStatus: CameraStatus;
   cameraStatusMessage: string;
   cameraError: string | null;
-  startCamera: () => Promise<void>;
+  startCamera: (mode?: 'user' | 'environment') => Promise<void>;
   stopCamera: () => void;
   retryCamera: () => Promise<void>;
+  toggleCameraFacing: () => Promise<void>;
+  facingMode: 'user' | 'environment';
+  hasMultipleCameras: boolean;
   fps: number;
 }
 
@@ -85,12 +88,32 @@ export function useWebcamHands(): UseWebcamHandsReturn {
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [fps, setFps] = useState(0);
 
+  // Mobile / Camera facing support
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
+  const [hasMultipleCameras, setHasMultipleCameras] = useState<boolean>(false);
+  const facingModeRef = useRef<'user' | 'environment'>('user');
+  const isCameraActiveRef = useRef<boolean>(false);
+
   const streamRef = useRef<MediaStream | null>(null);
   const handsModelRef = useRef<any>(null);
   const animFrameIdRef = useRef<number | null>(null);
   const frameCountRef = useRef(0);
   const lastFpsUpdateRef = useRef(performance.now());
+  const lastFrameProcessTimeRef = useRef(performance.now());
   const isProcessingRef = useRef(false);
+
+  // Detect multiple cameras (e.g. mobile front & back)
+  useEffect(() => {
+    if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
+      navigator.mediaDevices
+        .enumerateDevices()
+        .then((devices) => {
+          const videoInputs = devices.filter((d) => d.kind === 'videoinput');
+          setHasMultipleCameras(videoInputs.length > 1);
+        })
+        .catch(() => {});
+    }
+  }, []);
 
   // Stop camera tracks cleanly
   const stopCamera = useCallback(() => {
@@ -102,6 +125,7 @@ export function useWebcamHands(): UseWebcamHandsReturn {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => {
         track.stop();
+        track.enabled = false;
       });
       streamRef.current = null;
     }
@@ -117,6 +141,8 @@ export function useWebcamHands(): UseWebcamHandsReturn {
       }
     }
 
+    isProcessingRef.current = false;
+    isCameraActiveRef.current = false;
     setIsCameraActive(false);
     setIsHandDetected(false);
     setHandsCount(0);
@@ -139,16 +165,17 @@ export function useWebcamHands(): UseWebcamHandsReturn {
     ) => {
       ctx.clearRect(0, 0, width, height);
 
-      if (!hands || hands.length === 0) return;
+      const mapX = (xNorm: number) =>
+        facingModeRef.current === 'user' ? (1 - xNorm) * width : xNorm * width;
 
       // 1. If 2 hands are present, draw an interactive inter-hand relation bridge
       if (hands.length >= 2) {
         const leftHand = hands.find((h) => h.handedness === 'Left') || hands[0];
         const rightHand = hands.find((h) => h.handedness === 'Right') || hands[1];
 
-        const lx = (1 - leftHand.wrist.x) * width;
+        const lx = mapX(leftHand.wrist.x);
         const ly = leftHand.wrist.y * height;
-        const rx = (1 - rightHand.wrist.x) * width;
+        const rx = mapX(rightHand.wrist.x);
         const ry = rightHand.wrist.y * height;
 
         ctx.save();
@@ -194,16 +221,15 @@ export function useWebcamHands(): UseWebcamHandsReturn {
           if (!start || !end) continue;
 
           ctx.beginPath();
-          // Mirrored horizontal coordinates
-          ctx.moveTo((1 - start.x) * width, start.y * height);
-          ctx.lineTo((1 - end.x) * width, end.y * height);
+          ctx.moveTo(mapX(start.x), start.y * height);
+          ctx.lineTo(mapX(end.x), end.y * height);
           ctx.stroke();
         }
 
         // Draw Joints
         for (let i = 0; i < rawLandmarks.length; i++) {
           const pt = rawLandmarks[i];
-          const cx = (1 - pt.x) * width;
+          const cx = mapX(pt.x);
           const cy = pt.y * height;
 
           ctx.beginPath();
@@ -231,7 +257,7 @@ export function useWebcamHands(): UseWebcamHandsReturn {
         // Draw Hand Identifier Badge near wrist
         const wristPt = rawLandmarks[0];
         if (wristPt) {
-          const wx = (1 - wristPt.x) * width;
+          const wx = mapX(wristPt.x);
           const wy = wristPt.y * height - 14;
 
           ctx.save();
@@ -411,18 +437,39 @@ export function useWebcamHands(): UseWebcamHandsReturn {
     return hands;
   }, [drawHandsSkeleton]);
 
-  // Frame processing loop
+  // Throttled frame processing loop with watchdog to prevent UI freezes
   const processFrame = useCallback(async () => {
     if (!videoRef.current || videoRef.current.readyState < 2 || !handsModelRef.current) {
       animFrameIdRef.current = requestAnimationFrame(processFrame);
       return;
     }
 
+    const now = performance.now();
+    const isMobileDevice =
+      typeof window !== 'undefined' &&
+      (/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) || window.innerWidth <= 768);
+    const minInterval = isMobileDevice ? 48 : 38; // ~21-26 FPS target for zero-lag responsiveness
+
+    if (now - lastFrameProcessTimeRef.current < minInterval) {
+      animFrameIdRef.current = requestAnimationFrame(processFrame);
+      return;
+    }
+
     if (!isProcessingRef.current) {
       isProcessingRef.current = true;
+      lastFrameProcessTimeRef.current = now;
+
+      // Watchdog timeout to prevent permanent lock if MediaPipe stalls
+      const watchdog = setTimeout(() => {
+        isProcessingRef.current = false;
+      }, 250);
+
       try {
         await handsModelRef.current.send({ image: videoRef.current });
-      } catch (err) {
+      } catch {
+        // Ignored, proceed to next frame
+      } finally {
+        clearTimeout(watchdog);
         isProcessingRef.current = false;
       }
     }
@@ -430,56 +477,92 @@ export function useWebcamHands(): UseWebcamHandsReturn {
     animFrameIdRef.current = requestAnimationFrame(processFrame);
   }, []);
 
-  // Start camera stream
-  const startCamera = useCallback(async () => {
-    setCameraError(null);
-    setCameraStatus('starting');
-    setCameraStatusMessage('Initializing camera & MediaPipe dual-hand vision engine...');
+  // Start camera stream with adaptive mobile/desktop constraints
+  const startCamera = useCallback(
+    async (desiredMode?: 'user' | 'environment') => {
+      setCameraError(null);
+      setCameraStatus('starting');
+      setCameraStatusMessage('Initializing camera & MediaPipe dual-hand vision engine...');
 
-    try {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Your browser does not support camera access (MediaDevices API).');
+      const targetMode = desiredMode || facingModeRef.current;
+      facingModeRef.current = targetMode;
+      setFacingMode(targetMode);
+
+      try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error('Your browser does not support camera access (MediaDevices API).');
+        }
+
+        // Cleanly stop any existing stream tracks first
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach((track) => {
+            track.stop();
+            track.enabled = false;
+          });
+          streamRef.current = null;
+        }
+
+        const isMobileDevice =
+          typeof window !== 'undefined' &&
+          (/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) || window.innerWidth <= 768);
+
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: targetMode,
+            width: { ideal: isMobileDevice ? 640 : 1280, max: 1920 },
+            height: { ideal: isMobileDevice ? 480 : 720, max: 1080 }
+          },
+          audio: false
+        });
+
+        streamRef.current = stream;
+
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play();
+        }
+
+        // Initialize MediaPipe with dual-hand tracking
+        await initMediaPipeHands();
+
+        setIsCameraActive(true);
+        isCameraActiveRef.current = true;
+        setCameraStatus('no_hand');
+        setCameraStatusMessage('Camera active — Waiting for hand(s) in frame...');
+
+        // Start processing loop
+        animFrameIdRef.current = requestAnimationFrame(processFrame);
+      } catch (err: any) {
+        console.error('Camera start error:', err);
+        let msg = err.message || 'Could not access camera.';
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+          msg = 'Camera permission denied. Please allow camera access in your browser address bar.';
+        } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+          msg = 'No camera device detected on this system.';
+        } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+          msg = 'Camera is currently in use by another application or tab.';
+        }
+        setCameraError(msg);
+        setCameraStatus('error');
+        setCameraStatusMessage(`Camera error: ${msg}`);
+        stopCamera();
       }
+    },
+    [initMediaPipeHands, processFrame, stopCamera]
+  );
 
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          width: { ideal: 640 },
-          height: { ideal: 480 },
-          facingMode: 'user'
-        },
-        audio: false
-      });
+  // Toggle front/rear camera on mobile devices
+  const toggleCameraFacing = useCallback(async () => {
+    const nextMode = facingModeRef.current === 'user' ? 'environment' : 'user';
+    facingModeRef.current = nextMode;
+    setFacingMode(nextMode);
 
-      streamRef.current = stream;
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
-
-      // Initialize MediaPipe with dual-hand tracking
-      await initMediaPipeHands();
-
-      setIsCameraActive(true);
-      setCameraStatus('no_hand');
-      setCameraStatusMessage('Camera active — Waiting for hand(s) in frame...');
-
-      // Start processing loop
-      animFrameIdRef.current = requestAnimationFrame(processFrame);
-    } catch (err: any) {
-      console.error('Camera start error:', err);
-      let msg = err.message || 'Could not access camera.';
-      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        msg = 'Camera permission denied. Please allow camera access in your browser address bar.';
-      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-        msg = 'No webcam detected on this device.';
-      }
-      setCameraError(msg);
-      setCameraStatus('error');
-      setCameraStatusMessage(`Camera error: ${msg}`);
+    if (isCameraActiveRef.current) {
       stopCamera();
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      await startCamera(nextMode);
     }
-  }, [initMediaPipeHands, processFrame, stopCamera]);
+  }, [startCamera, stopCamera]);
 
   // Retry camera upon failure
   const retryCamera = useCallback(async () => {
@@ -488,6 +571,27 @@ export function useWebcamHands(): UseWebcamHandsReturn {
     await new Promise((resolve) => setTimeout(resolve, 300));
     await startCamera();
   }, [startCamera, stopCamera]);
+
+  // Tab visibility listener: pauses frame loop while hidden to save battery & CPU
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.hidden) {
+        if (animFrameIdRef.current) {
+          cancelAnimationFrame(animFrameIdRef.current);
+          animFrameIdRef.current = null;
+        }
+      } else {
+        if (isCameraActiveRef.current && !animFrameIdRef.current) {
+          animFrameIdRef.current = requestAnimationFrame(processFrame);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [processFrame]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -513,6 +617,9 @@ export function useWebcamHands(): UseWebcamHandsReturn {
     startCamera,
     stopCamera,
     retryCamera,
+    toggleCameraFacing,
+    facingMode,
+    hasMultipleCameras,
     fps
   };
 }

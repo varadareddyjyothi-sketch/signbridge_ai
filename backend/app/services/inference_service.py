@@ -13,7 +13,7 @@ import joblib
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any, Tuple
 from backend.app.config import settings
-from ml.features import normalize_landmarks, FEATURE_DIMENSION, NUM_LANDMARKS
+from ml.features import normalize_landmarks, FEATURE_DIMENSION, NUM_LANDMARKS, ENHANCED_FEATURE_DIMENSION, extract_model_features
 
 VERIFIED_ISL_METADATA: Dict[str, Dict[str, Any]] = {
     "ISL_1": {
@@ -425,11 +425,10 @@ class InferenceService:
         # Preprocess features
         try:
             if features is not None and len(features) == FEATURE_DIMENSION:
-                input_vector = np.array(features, dtype=np.float32).reshape(1, -1)
+                feat = np.array(features, dtype=np.float32)
             elif landmarks is not None:
                 pts = [_to_landmark_dict(pt) for pt in landmarks]
                 feat = normalize_landmarks(pts, handedness=handedness)
-                input_vector = feat.reshape(1, -1)
             else:
                 return {
                     "detected": False,
@@ -444,6 +443,12 @@ class InferenceService:
                     "rejection_threshold_used": threshold,
                     "timestamp": now_iso
                 }
+
+            expected_dim = getattr(self.model, "n_features_in_", FEATURE_DIMENSION)
+            if expected_dim == ENHANCED_FEATURE_DIMENSION:
+                input_vector = extract_model_features(feat).reshape(1, -1)
+            else:
+                input_vector = feat.reshape(1, -1)
         except Exception as e:
             return {
                 "detected": False,

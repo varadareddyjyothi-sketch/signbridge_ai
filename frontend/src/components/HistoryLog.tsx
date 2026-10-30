@@ -4,9 +4,6 @@ import {
   Trash2,
   RefreshCw,
   Clock,
-  ShieldCheck,
-  HardDrive,
-  FileSpreadsheet,
   Languages,
   Layers,
   Copy,
@@ -31,15 +28,10 @@ export const HistoryLog: React.FC<HistoryLogProps> = ({ currentUser }) => {
 
   // Confirmed Sentences state
   const [sentences, setSentences] = useState<SentenceHistoryEntry[]>([]);
-  const [sentenceStorageMode, setSentenceStorageMode] = useState<string>('local_sqlite');
-
-  // Gesture frames state
   const [gestures, setGestures] = useState<HistoryItem[]>([]);
-  const [gestureStorageMode, setGestureStorageMode] = useState<string>('local_sqlite');
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isClearing, setIsClearing] = useState<boolean>(false);
-  const [isExporting, setIsExporting] = useState<boolean>(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -69,7 +61,6 @@ export const HistoryLog: React.FC<HistoryLogProps> = ({ currentUser }) => {
 
       if (sentRes.status === 'fulfilled') {
         setSentences(sentRes.value.items);
-        setSentenceStorageMode(sentRes.value.storage_mode);
         hasSuccess = true;
       } else {
         errorMsg = sentRes.reason?.message || 'Failed to fetch sentence history';
@@ -77,7 +68,6 @@ export const HistoryLog: React.FC<HistoryLogProps> = ({ currentUser }) => {
 
       if (gestRes.status === 'fulfilled') {
         setGestures(gestRes.value.items);
-        setGestureStorageMode(gestRes.value.storage_mode);
         hasSuccess = true;
       } else {
         if (!errorMsg) errorMsg = gestRes.reason?.message || 'Failed to fetch recognition history';
@@ -186,18 +176,6 @@ export const HistoryLog: React.FC<HistoryLogProps> = ({ currentUser }) => {
     }
   };
 
-  const handleExportExcel = async () => {
-    setIsExporting(true);
-    try {
-      await api.downloadExcelExport();
-      showFeedback('success', 'Excel workbook downloaded successfully.');
-    } catch (err: any) {
-      showFeedback('error', `Export failed: ${err.message || 'Network error'}`);
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
   const handleCopy = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
@@ -208,7 +186,6 @@ export const HistoryLog: React.FC<HistoryLogProps> = ({ currentUser }) => {
     ttsService.speak(text, lang);
   };
 
-  const currentStorageMode = activeTab === 'sentences' ? sentenceStorageMode : gestureStorageMode;
   const currentTabCount = activeTab === 'sentences' ? sentences.length : gestures.length;
   const totalCount = sentences.length + gestures.length;
 
@@ -244,7 +221,7 @@ export const HistoryLog: React.FC<HistoryLogProps> = ({ currentUser }) => {
             </h2>
           </div>
           <p style={{ fontSize: '0.84rem', color: '#64748b', marginTop: '3px', marginBottom: 0 }}>
-            Inspect, refresh, export, and manage your verified sign recognitions and confirmed sentence records.
+            Inspect, refresh, and manage your verified sign recognitions and confirmed sentence records.
           </p>
         </div>
 
@@ -258,43 +235,6 @@ export const HistoryLog: React.FC<HistoryLogProps> = ({ currentUser }) => {
             <User size={13} color="#475569" />
             <span>{currentUser ? currentUser.display_name : 'Guest Session (Local)'}</span>
           </div>
-
-          {/* Storage Badge */}
-          <div
-            className="badge badge-neutral"
-            style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 11px', fontSize: '0.76rem' }}
-          >
-            {currentStorageMode === 'mongodb' ? (
-              <>
-                <ShieldCheck size={13} color="#059669" />
-                <span>Cloud (MongoDB Atlas)</span>
-              </>
-            ) : (
-              <>
-                <HardDrive size={13} color="#d97706" />
-                <span>Local (SQLite)</span>
-              </>
-            )}
-          </div>
-
-          {/* Export to Excel Button */}
-          <button
-            className="btn btn-secondary"
-            onClick={handleExportExcel}
-            disabled={isExporting}
-            style={{
-              padding: '7px 13px',
-              fontSize: '0.82rem',
-              background: '#ecfdf5',
-              borderColor: '#a7f3d0',
-              color: '#047857',
-              fontWeight: 600
-            }}
-            title="Download complete activity history as a styled Excel workbook (.xlsx)"
-          >
-            <FileSpreadsheet size={15} />
-            <span>{isExporting ? 'Generating...' : 'Export (.xlsx)'}</span>
-          </button>
 
           {/* Refresh Button */}
           <button
@@ -433,7 +373,7 @@ export const HistoryLog: React.FC<HistoryLogProps> = ({ currentUser }) => {
         <div className="glass-panel" style={{ padding: '48px', textAlign: 'center', color: '#64748b' }}>
           <RefreshCw size={26} className="animate-spin" style={{ margin: '0 auto 12px auto', color: '#2563eb' }} />
           <p style={{ margin: 0, fontWeight: 600, color: '#334155' }}>Fetching records from database...</p>
-          <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Checking {currentStorageMode === 'mongodb' ? 'MongoDB Atlas cloud' : 'local SQLite storage'}</span>
+          <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Connecting to persistent storage</span>
         </div>
       ) : activeTab === 'sentences' ? (
         /* Confirmed Sentences View */
@@ -446,7 +386,7 @@ export const HistoryLog: React.FC<HistoryLogProps> = ({ currentUser }) => {
               {searchQuery ? 'No Matching Sentences Found' : 'No Confirmed Sentences Yet'}
             </h3>
             <p style={{ fontSize: '0.86rem', color: '#64748b', maxWidth: '380px', margin: '0 auto' }}>
-              {searchQuery ? `No sentences match "${searchQuery}". Clear your search query to see all records.` : 'When you confirm sentences in the communication workspace, they will be securely stored in MongoDB and included in your Excel export.'}
+              {searchQuery ? `No sentences match "${searchQuery}". Clear your search query to see all records.` : 'When you confirm sentences in the communication workspace, they will be securely stored in your database.'}
             </p>
           </div>
         ) : (

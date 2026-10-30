@@ -17,7 +17,8 @@ import {
   Clock,
   Globe,
   Languages,
-  Search
+  Search,
+  RefreshCw
 } from 'lucide-react';
 import { useWebcamHands } from '../hooks/useWebcamHands';
 import { api } from '../services/api';
@@ -67,7 +68,10 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
     startCamera,
     stopCamera,
     retryCamera,
-    fps
+    fps,
+    facingMode,
+    toggleCameraFacing,
+    hasMultipleCameras
   } = useWebcamHands();
 
   // Mode Selection: Pretrained General Gestures vs Custom ISL Classifier
@@ -676,7 +680,7 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
               width: '100%',
               height: '100%',
               objectFit: 'cover',
-              transform: 'scaleX(-1)',
+              transform: facingMode === 'user' ? 'scaleX(-1)' : 'none',
               opacity: isCameraActive ? 1 : 0
             }}
           />
@@ -735,7 +739,7 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
               <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', maxWidth: '340px', marginBottom: '20px', lineHeight: 1.5 }}>
                 Click below to start your camera. Supported gestures will be recognized live without pressing any buttons.
               </p>
-              <button className="btn btn-primary" onClick={startCamera} style={{ padding: '12px 24px' }}>
+              <button className="btn btn-primary" onClick={() => startCamera()} style={{ padding: '12px 24px' }}>
                 <Camera size={18} />
                 <span>Start Camera</span>
               </button>
@@ -853,7 +857,7 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
                   <span>Stop Camera</span>
                 </button>
               ) : (
-                <button className="btn btn-primary" onClick={startCamera}>
+                <button className="btn btn-primary" onClick={() => startCamera()}>
                   <Camera size={15} />
                   <span>Start Camera</span>
                 </button>
@@ -866,6 +870,18 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
                 >
                   {isRecognizing ? <Square size={14} /> : <Play size={14} />}
                   <span>{isRecognizing ? 'Stop Recognition' : 'Start Recognition'}</span>
+                </button>
+              )}
+
+              {isCameraActive && (
+                <button
+                  className="btn btn-secondary"
+                  onClick={toggleCameraFacing}
+                  title={hasMultipleCameras ? `Switch between front and rear cameras (currently ${facingMode})` : `Toggle camera orientation (currently ${facingMode})`}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <RefreshCw size={14} />
+                  <span>{facingMode === 'user' ? 'Rear Camera' : 'Front Camera'}</span>
                 </button>
               )}
             </div>

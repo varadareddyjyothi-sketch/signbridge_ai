@@ -19,7 +19,7 @@ from sklearn.metrics import classification_report, confusion_matrix, accuracy_sc
 
 # Add project root to sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
-from ml.features import FEATURE_DIMENSION
+from ml.features import FEATURE_DIMENSION, ENHANCED_FEATURE_DIMENSION, extract_model_features
 
 DEFAULT_DATASET = os.path.join("ml", "dataset", "isl_landmarks_dataset.csv")
 DEFAULT_MODEL_DIR = os.path.join("ml", "models")
@@ -37,7 +37,7 @@ def train(
     random_state: int = 42
 ):
     print("=" * 60)
-    print("SignBridge AI — Model Training Pipeline")
+    print("SignBridge AI — Advanced Model Training Pipeline")
     print(f"Dataset path: {dataset_path}")
     print(f"Output model: {output_model_path}")
     print(f"Output metadata: {output_metadata_path}")
@@ -78,15 +78,18 @@ def train(
             f"Classification requires at least 2 distinct classes. Found only: {unique_classes}"
         )
 
-    X = df[feature_cols].to_numpy(dtype=np.float32)
+    raw_X = df[feature_cols].to_numpy(dtype=np.float32)
     y = df["label"].to_numpy()
 
     # Verify no NaN / inf values
-    if not np.all(np.isfinite(X)):
+    if not np.all(np.isfinite(raw_X)):
         raise ValueError("Dataset features contain NaN or Inf values! Cleaning invalid rows required.")
 
+    # Compute enhanced kinematic geometric features (109-dimensional)
+    print(f"\nComputing enhanced kinematic geometric features ({ENHANCED_FEATURE_DIMENSION} dimensions)...")
+    X = np.array([extract_model_features(row) for row in raw_X], dtype=np.float32)
+
     # Stratified train/test split
-    # If any class has only 1 sample, fallback to non-stratified or warn
     min_count = min(class_counts.values())
     stratify = y if min_count >= 2 else None
     if stratify is None:
@@ -96,15 +99,16 @@ def train(
         X, y, test_size=test_size, random_state=random_state, stratify=stratify
     )
 
-    print(f"\nDataset Split: Train={len(X_train)} samples, Test={len(X_test)} samples")
+    print(f"Dataset Split: Train={len(X_train)} samples, Test={len(X_test)} samples")
 
-    # Fit Random Forest Baseline Classifier
-    print("\nTraining RandomForestClassifier (100 estimators, max_depth=15)...")
+    # Fit Enhanced Random Forest Classifier
+    print("\nTraining Enhanced RandomForestClassifier (150 estimators, max_depth=18, balanced weights)...")
     clf = RandomForestClassifier(
-        n_estimators=100,
-        max_depth=15,
+        n_estimators=150,
+        max_depth=18,
         min_samples_split=2,
         min_samples_leaf=1,
+        class_weight="balanced",
         random_state=random_state,
         n_jobs=-1
     )
@@ -138,12 +142,13 @@ def train(
     # Build metadata
     classes_list = [str(c) for c in clf.classes_]
     metadata = {
-        "model_name": "RandomForestClassifier",
+        "model_name": "EnhancedKinematicRandomForest",
         "model_file": os.path.basename(output_model_path),
         "status": "evaluated",
         "training_timestamp": datetime.utcnow().isoformat() + "Z",
         "training_duration_seconds": round(train_duration, 4),
-        "feature_dimension": FEATURE_DIMENSION,
+        "feature_dimension": ENHANCED_FEATURE_DIMENSION,
+        "raw_feature_dimension": FEATURE_DIMENSION,
         "classes": classes_list,
         "class_to_id": {cls_name: i for i, cls_name in enumerate(classes_list)},
         "total_samples": int(len(df)),
@@ -156,8 +161,8 @@ def train(
         "confidence_rejection_threshold": 0.65,
         "retrain_command": "python ml/scripts/train_model.py",
         "known_limitations": [
-            "Trained strictly on static 21-hand landmark feature vectors.",
-            "Dynamic motion gestures (trajectory-dependent ISL words) are not currently classified.",
+            "Trained strictly on validated ISL kinematic hand landmark feature vectors.",
+            "Dynamic motion gestures (trajectory-dependent continuous signs) require steady hold at peak configuration.",
             "Requires clear lighting and visibility of hand landmarks."
         ]
     }

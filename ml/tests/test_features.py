@@ -78,3 +78,19 @@ def test_invalid_landmarks_rejection():
     bad_lms[5]["x"] = float("nan")
     with pytest.raises(ValueError):
         normalize_landmarks(bad_lms)
+
+
+def test_enhanced_model_features():
+    from ml.features import extract_model_features, ENHANCED_FEATURE_DIMENSION, extract_kinematic_features
+    lms = generate_mock_hand_landmarks()
+    feats = extract_model_features(lms)
+    assert isinstance(feats, np.ndarray)
+    assert feats.shape == (ENHANCED_FEATURE_DIMENSION,)
+    assert np.all(np.isfinite(feats))
+
+    # Also test from flattened 63-D array
+    norm_63 = normalize_landmarks(lms)
+    feats2 = extract_model_features(norm_63)
+    assert feats2.shape == (ENHANCED_FEATURE_DIMENSION,)
+    np.testing.assert_allclose(feats, feats2, atol=1e-5)
+

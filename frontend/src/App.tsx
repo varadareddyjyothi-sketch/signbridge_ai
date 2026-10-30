@@ -29,7 +29,7 @@ function parseCurrentRoute(): ParsedRoute {
   if (!segment || segment === 'home' || segment === '') {
     return { tab: 'home', isNotFound: false, openAuth: false, path: '/' };
   }
-  if (segment === 'recognition' || segment === 'dashboard') {
+  if (segment === 'recognition' || segment === 'dashboard' || segment === 'live') {
     return { tab: 'recognition', isNotFound: false, openAuth: false, path: '/recognition' };
   }
   if (segment === 'guide' || segment === 'library') {
