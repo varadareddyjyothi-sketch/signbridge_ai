@@ -64,16 +64,16 @@ export const TwoWaySpeechPanel: React.FC = () => {
   };
 
   return (
-    <div className="glass-panel" style={{ padding: '24px', marginTop: '24px' }}>
+    <div className="glass-panel" style={{ padding: '22px', marginTop: '20px', borderRadius: '10px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <MessageSquare size={20} color="#38bdf8" />
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>
+            <MessageSquare size={19} color="#2563eb" />
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0, color: '#0f172a' }}>
               Two-Way Communication Bridge: Partner to Signer
             </h3>
           </div>
-          <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: '4px', marginBottom: 0 }}>
+          <p style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '4px', marginBottom: 0 }}>
             Hearing/speaking partners can type or speak their reply so the sign-language user can read it clearly.
           </p>
         </div>
@@ -84,16 +84,16 @@ export const TwoWaySpeechPanel: React.FC = () => {
               <button
                 className="btn btn-secondary"
                 onClick={handleSpeakMessage}
-                style={{ padding: '7px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                style={{ padding: '6px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '5px' }}
                 title="Speak message aloud"
               >
-                <Volume2 size={14} color="#818cf8" />
+                <Volume2 size={14} color="#2563eb" />
                 <span>Speak</span>
               </button>
               <button
                 className="btn btn-secondary"
                 onClick={handleClear}
-                style={{ padding: '7px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                style={{ padding: '6px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '5px' }}
               >
                 <Trash2 size={14} />
                 <span>Clear</span>
@@ -105,24 +105,24 @@ export const TwoWaySpeechPanel: React.FC = () => {
             className={`btn ${isListening ? 'btn-danger' : 'btn-secondary'}`}
             onClick={handleToggleListening}
             disabled={!isSupported}
-            style={{ padding: '7px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+            style={{ padding: '6px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}
             title={isSupported ? 'Speak using microphone' : 'Microphone speech recognition not supported in this browser'}
           >
-            {isListening ? <MicOff size={15} /> : <Mic size={15} />}
+            {isListening ? <MicOff size={15} /> : <Mic size={15} color="#2563eb" />}
             <span>{isListening ? 'Stop Mic' : 'Voice Input'}</span>
           </button>
         </div>
       </div>
 
       {!isSupported && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', borderRadius: '8px', background: 'rgba(244, 63, 94, 0.1)', color: '#fb7185', fontSize: '0.8rem', marginBottom: '14px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', borderRadius: '6px', background: '#fff1f2', color: '#be123c', border: '1px solid #fecdd3', fontSize: '0.8rem', marginBottom: '14px' }}>
           <AlertCircle size={15} />
           <span>Microphone speech recognition is not supported in this browser. You can type your reply below.</span>
         </div>
       )}
 
       {errorMessage && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', borderRadius: '8px', background: 'rgba(245, 158, 11, 0.1)', color: '#fcd34d', fontSize: '0.8rem', marginBottom: '14px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', borderRadius: '6px', background: '#fffbeb', color: '#b45309', border: '1px solid #fde68a', fontSize: '0.8rem', marginBottom: '14px' }}>
           <AlertCircle size={15} />
           <span>{errorMessage}</span>
         </div>
@@ -137,22 +137,21 @@ export const TwoWaySpeechPanel: React.FC = () => {
           placeholder="Type a message or response for the signer (e.g. 'Yes, I understand' or 'The bus arrives at 4 PM')..."
           style={{
             flex: 1,
-            padding: '10px 14px',
-            borderRadius: '10px',
-            background: 'rgba(15, 23, 42, 0.7)',
-            border: '1px solid var(--border-subtle)',
-            color: '#ffffff',
-            fontSize: '0.88rem',
-            outline: 'none'
+            padding: '9px 12px',
+            borderRadius: '6px',
+            background: '#ffffff',
+            border: '1px solid #cbd5e1',
+            color: '#0f172a',
+            fontSize: '0.88rem'
           }}
         />
         <button
           type="submit"
           className="btn btn-primary"
           disabled={!typedMessage.trim()}
-          style={{ padding: '10px 18px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+          style={{ padding: '9px 16px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}
         >
-          <Send size={15} />
+          <Send size={14} />
           <span>Display Reply</span>
         </button>
       </form>
@@ -160,52 +159,43 @@ export const TwoWaySpeechPanel: React.FC = () => {
       {/* High-Contrast Reader Board for the Deaf / Hard-of-Hearing User */}
       <div
         style={{
-          background: '#030712',
-          borderRadius: '12px',
+          background: '#f8fafc',
+          borderRadius: '8px',
           border: isListening
-            ? '2px solid rgba(56, 189, 248, 0.8)'
+            ? '2px solid #2563eb'
             : activePartnerMessage
-            ? '1px solid rgba(56, 189, 248, 0.4)'
-            : '1px solid var(--border-subtle)',
-          boxShadow: isListening ? '0 0 24px rgba(56, 189, 248, 0.25)' : 'none',
-          padding: '20px 24px',
-          minHeight: '100px',
+            ? '1px solid #93c5fd'
+            : '1px solid #e2e8f0',
+          padding: '20px',
+          minHeight: '90px',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'center',
-          transition: 'all 0.3s ease'
+          transition: 'all 0.2s ease'
         }}
       >
         {activePartnerMessage ? (
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
               <span
-                className="badge"
-                style={{
-                  background: activePartnerMessage.source === 'typed' ? 'rgba(56, 189, 248, 0.15)' : 'rgba(168, 85, 247, 0.15)',
-                  color: activePartnerMessage.source === 'typed' ? '#38bdf8' : '#c084fc',
-                  border: `1px solid ${activePartnerMessage.source === 'typed' ? 'rgba(56, 189, 248, 0.3)' : 'rgba(168, 85, 247, 0.3)'}`,
-                  fontSize: '0.7rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}
+                className="badge badge-primary"
+                style={{ fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '4px' }}
               >
                 <UserCheck size={11} />
                 <span>Partner Reply ({activePartnerMessage.source === 'typed' ? 'Typed Text' : 'Voice Input'})</span>
               </span>
-              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+              <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
                 {activePartnerMessage.timestamp}
               </span>
             </div>
-            <p style={{ fontSize: '1.35rem', fontWeight: 600, color: '#f8fafc', lineHeight: 1.45, margin: 0 }}>
+            <p style={{ fontSize: '1.3rem', fontWeight: 600, color: '#0f172a', lineHeight: 1.45, margin: 0 }}>
               "{activePartnerMessage.text}"
             </p>
           </div>
         ) : (
-          <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.86rem', fontStyle: 'italic' }}>
+          <div style={{ textAlign: 'center', color: '#64748b', fontSize: '0.86rem' }}>
             {isListening ? (
-              <span style={{ color: '#38bdf8' }}>Listening... Speak clearly into the microphone.</span>
+              <span style={{ color: '#2563eb', fontWeight: 600 }}>Listening... Speak clearly into the microphone.</span>
             ) : (
               'Replies from your conversation partner will appear here in large, high-contrast text.'
             )}

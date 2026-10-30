@@ -1,0 +1,252 @@
+{
+  "model_name": "RandomForestClassifier",
+  "model_file": "signbridge_rf_model.joblib",
+  "status": "evaluated",
+  "training_timestamp": "2026-10-29T16:54:14.189224Z",
+  "training_duration_seconds": 0.5622,
+  "feature_dimension": 63,
+  "classes": [
+    "ISL_1",
+    "ISL_2",
+    "ISL_3",
+    "ISL_4",
+    "ISL_5",
+    "ISL_FIST",
+    "ISL_NO_INDEX",
+    "ISL_OK",
+    "ISL_PEACE_VICTORY",
+    "ISL_YES_THUMBS_UP"
+  ],
+  "class_to_id": {
+    "ISL_1": 0,
+    "ISL_2": 1,
+    "ISL_3": 2,
+    "ISL_4": 3,
+    "ISL_5": 4,
+    "ISL_FIST": 5,
+    "ISL_NO_INDEX": 6,
+    "ISL_OK": 7,
+    "ISL_PEACE_VICTORY": 8,
+    "ISL_YES_THUMBS_UP": 9
+  },
+  "total_samples": 607,
+  "train_samples": 485,
+  "test_samples": 122,
+  "samples_per_class": {
+    "ISL_1": 67,
+    "ISL_2": 60,
+    "ISL_3": 60,
+    "ISL_4": 60,
+    "ISL_5": 60,
+    "ISL_OK": 60,
+    "ISL_YES_THUMBS_UP": 60,
+    "ISL_NO_INDEX": 60,
+    "ISL_PEACE_VICTORY": 60,
+    "ISL_FIST": 60
+  },
+  "test_accuracy": 0.8278688524590164,
+  "classification_report": {
+    "ISL_1": {
+      "precision": 0.5454545454545454,
+      "recall": 0.42857142857142855,
+      "f1-score": 0.48,
+      "support": 14.0
+    },
+    "ISL_2": {
+      "precision": 0.7,
+      "recall": 0.5833333333333334,
+      "f1-score": 0.6363636363636364,
+      "support": 12.0
+    },
+    "ISL_3": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 12.0
+    },
+    "ISL_4": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 12.0
+    },
+    "ISL_5": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 12.0
+    },
+    "ISL_FIST": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 12.0
+    },
+    "ISL_NO_INDEX": {
+      "precision": 0.4666666666666667,
+      "recall": 0.5833333333333334,
+      "f1-score": 0.5185185185185185,
+      "support": 12.0
+    },
+    "ISL_OK": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 12.0
+    },
+    "ISL_PEACE_VICTORY": {
+      "precision": 0.6428571428571429,
+      "recall": 0.75,
+      "f1-score": 0.6923076923076923,
+      "support": 12.0
+    },
+    "ISL_YES_THUMBS_UP": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 12.0
+    },
+    "accuracy": 0.8278688524590164,
+    "macro avg": {
+      "precision": 0.8354978354978355,
+      "recall": 0.8345238095238094,
+      "f1-score": 0.8327189847189846,
+      "support": 122.0
+    },
+    "weighted avg": {
+      "precision": 0.8307430274643389,
+      "recall": 0.8278688524590164,
+      "f1-score": 0.8269367062809685,
+      "support": 122.0
+    }
+  },
+  "confusion_matrix": [
+    [
+      6,
+      0,
+      0,
+      0,
+      0,
+      0,
+      8,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      7,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      5,
+      0
+    ],
+    [
+      0,
+      0,
+      12,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      12,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      12,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      12,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      5,
+      0,
+      0,
+      0,
+      0,
+      0,
+      7,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      12,
+      0,
+      0
+    ],
+    [
+      0,
+      3,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      9,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      12
+    ]
+  ],
+  "confidence_rejection_threshold": 0.65,
+  "retrain_command": "python ml/scripts/train_model.py",
+  "known_limitations": [
+    "Trained strictly on static 21-hand landmark feature vectors.",
+    "Dynamic motion gestures (trajectory-dependent ISL words) are not currently classified.",
+    "Requires clear lighting and visibility of hand landmarks."
+  ]
+}

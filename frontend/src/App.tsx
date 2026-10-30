@@ -3,7 +3,6 @@ import { Navbar, type AppNavTab } from './components/Navbar';
 import { HomeScreen } from './components/HomeScreen';
 import { CameraRecognitionPanel } from './components/CameraRecognitionPanel';
 import { TwoWaySpeechPanel } from './components/TwoWaySpeechPanel';
-import { AdminToolsPanel } from './components/AdminToolsPanel';
 import { HistoryLog } from './components/HistoryLog';
 import { ISLGuide } from './components/ISLGuide';
 import { AuthModal } from './components/AuthModal';
@@ -15,7 +14,6 @@ export function App() {
   const [activeTab, setActiveTab] = useState<AppNavTab>('home');
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [modelStatus, setModelStatus] = useState<ModelStatus | null>(null);
-  const [selectedStudioClassId, setSelectedStudioClassId] = useState<string | null>(null);
   const [practiceTargetSign, setPracticeTargetSign] = useState<{ id: string; name: string } | null>(null);
 
   // User Authentication State
@@ -63,10 +61,7 @@ export function App() {
 
   const handleOpenQuickPhrases = () => {
     setActiveTab('recognition');
-    setTimeout(() => {
-      const el = document.getElementById('quick-phrase-library-section');
-      if (el) el.scrollIntoView({ behavior: 'smooth' });
-    }, 150);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleExploreGuide = () => {
@@ -129,11 +124,6 @@ export function App() {
               practiceTargetSign={practiceTargetSign}
               onClearPracticeTarget={() => setPracticeTargetSign(null)}
               onPredictionSaved={refreshSystemStatus}
-              onNavigateToStudio={() => {
-                setSelectedStudioClassId(null);
-                setActiveTab('admin');
-              }}
-              onNavigateToManageGestures={() => setActiveTab('admin')}
             />
 
             {/* Two-Way Communication Bridge */}
@@ -151,15 +141,6 @@ export function App() {
 
         {/* View 4: Conversation History & Excel Export */}
         {activeTab === 'history' && <HistoryLog />}
-
-        {/* View 5: Admin & Developer Studio (Cleanly Isolated) */}
-        {activeTab === 'admin' && (
-          <AdminToolsPanel
-            modelStatus={modelStatus}
-            onModelRetrained={refreshSystemStatus}
-            selectedClassId={selectedStudioClassId || undefined}
-          />
-        )}
       </main>
 
       {/* Auth Modal */}
@@ -183,17 +164,17 @@ export function App() {
       {/* Footer */}
       <footer
         style={{
-          borderTop: '1px solid var(--border-subtle)',
-          padding: '24px 20px',
-          background: 'rgba(3, 7, 18, 0.7)',
+          borderTop: '1px solid #e2e8f0',
+          padding: '20px',
+          background: '#ffffff',
           textAlign: 'center',
           fontSize: '0.82rem',
-          color: 'var(--text-muted)'
+          color: '#64748b'
         }}
       >
         <div className="container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
           <div>
-            <strong style={{ color: 'var(--text-primary)' }}>SignBridge AI</strong> — Indian Sign Language Communication Platform
+            <strong style={{ color: '#0f172a' }}>SignBridge AI</strong> — Indian Sign Language Communication Platform
           </div>
           <div>
             Powered by MediaPipe Hands & Scikit-Learn Random Forest

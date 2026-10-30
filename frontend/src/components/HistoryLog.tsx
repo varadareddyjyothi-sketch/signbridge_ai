@@ -118,51 +118,54 @@ export const HistoryLog: React.FC = () => {
   const currentStorageMode = activeTab === 'sentences' ? sentenceStorageMode : gestureStorageMode;
 
   return (
-    <div style={{ padding: '10px 0 30px 0' }}>
+    <div style={{ padding: '6px 0 32px 0' }}>
       {/* Header bar */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '14px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Database size={22} color="#818cf8" />
-            <h2 style={{ fontSize: '1.4rem', fontWeight: 800 }}>Recognition & Sentence History</h2>
+            <Database size={20} color="#2563eb" />
+            <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+              Recognition & Sentence History
+            </h2>
           </div>
-          <p style={{ fontSize: '0.86rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
-            Secure log of your confirmed sentences and verified gesture recognitions.
+          <p style={{ fontSize: '0.84rem', color: '#64748b', marginTop: '3px', marginBottom: 0 }}>
+            Log of your confirmed sentences and verified gesture recognitions with Excel export.
           </p>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           {/* Export to Excel Button */}
           <button
             className="btn btn-secondary"
             onClick={handleExportExcel}
             disabled={isExporting}
             style={{
-              padding: '8px 14px',
-              background: 'rgba(16, 185, 129, 0.15)',
-              border: '1px solid rgba(16, 185, 129, 0.4)',
-              color: '#34d399',
+              padding: '7px 14px',
+              fontSize: '0.84rem',
+              background: '#ecfdf5',
+              borderColor: '#a7f3d0',
+              color: '#047857',
               fontWeight: 600
             }}
             title="Download complete sentence and recognition history as a styled Excel workbook (.xlsx)"
           >
-            <FileSpreadsheet size={16} />
+            <FileSpreadsheet size={15} />
             <span>{isExporting ? 'Generating .xlsx...' : 'Export to Excel (.xlsx)'}</span>
           </button>
 
           {/* Storage Badge */}
           <div
             className="badge badge-neutral"
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px' }}
+            style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 10px', fontSize: '0.75rem' }}
           >
             {currentStorageMode === 'supabase' ? (
               <>
-                <ShieldCheck size={14} color="#10b981" />
+                <ShieldCheck size={13} color="#059669" />
                 <span>Cloud (Supabase)</span>
               </>
             ) : (
               <>
-                <HardDrive size={14} color="#f59e0b" />
+                <HardDrive size={13} color="#d97706" />
                 <span>Local (SQLite)</span>
               </>
             )}
@@ -172,7 +175,7 @@ export const HistoryLog: React.FC = () => {
             className="btn btn-secondary"
             onClick={loadHistory}
             disabled={isLoading}
-            style={{ padding: '8px 12px' }}
+            style={{ padding: '7px 12px', fontSize: '0.82rem' }}
           >
             <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
             <span>Refresh</span>
@@ -183,7 +186,7 @@ export const HistoryLog: React.FC = () => {
               className="btn btn-danger"
               onClick={handleClear}
               disabled={isClearing}
-              style={{ padding: '8px 14px' }}
+              style={{ padding: '7px 12px', fontSize: '0.82rem' }}
             >
               <Trash2 size={14} />
               <span>Clear {activeTab === 'sentences' ? 'Sentences' : 'Detections'}</span>
@@ -193,27 +196,27 @@ export const HistoryLog: React.FC = () => {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
         <button
           onClick={() => setActiveTab('sentences')}
           className={`btn ${activeTab === 'sentences' ? 'btn-primary' : 'btn-secondary'}`}
-          style={{ padding: '8px 16px', fontSize: '0.85rem' }}
+          style={{ padding: '7px 14px', fontSize: '0.84rem' }}
         >
-          <Languages size={15} />
+          <Languages size={14} />
           <span>Confirmed Sentences ({sentences.length})</span>
         </button>
         <button
           onClick={() => setActiveTab('gestures')}
           className={`btn ${activeTab === 'gestures' ? 'btn-primary' : 'btn-secondary'}`}
-          style={{ padding: '8px 16px', fontSize: '0.85rem' }}
+          style={{ padding: '7px 14px', fontSize: '0.84rem' }}
         >
-          <Layers size={15} />
+          <Layers size={14} />
           <span>Gesture Detections ({gestures.length})</span>
         </button>
       </div>
 
       {isLoading ? (
-        <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
+        <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
           <RefreshCw size={24} className="animate-spin" style={{ margin: '0 auto 10px auto' }} />
           <p>Loading history records...</p>
         </div>
@@ -221,34 +224,34 @@ export const HistoryLog: React.FC = () => {
         /* Confirmed Sentences View */
         sentences.length === 0 ? (
           <div className="glass-panel" style={{ padding: '48px', textAlign: 'center' }}>
-            <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'rgba(255, 255, 255, 0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px auto' }}>
-              <Languages size={28} color="#94a3b8" />
+            <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px auto' }}>
+              <Languages size={24} color="#2563eb" />
             </div>
-            <h3 style={{ fontSize: '1.15rem', marginBottom: '6px' }}>No Confirmed Sentences Yet</h3>
-            <p style={{ fontSize: '0.86rem', color: 'var(--text-secondary)', maxWidth: '380px', margin: '0 auto' }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#0f172a', marginBottom: '6px' }}>No Confirmed Sentences Yet</h3>
+            <p style={{ fontSize: '0.86rem', color: '#64748b', maxWidth: '380px', margin: '0 auto' }}>
               Build and confirm sentences in the "Build Your Sentence" workspace to save them here and export to Excel.
             </p>
           </div>
         ) : (
-          <div className="glass-panel" style={{ overflowX: 'auto', borderRadius: '12px' }}>
+          <div className="glass-panel" style={{ overflowX: 'auto', borderRadius: '8px' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
               <thead>
-                <tr style={{ borderBottom: '1px solid var(--border-subtle)', background: 'rgba(255, 255, 255, 0.02)' }}>
-                  <th style={{ padding: '14px 18px', color: 'var(--text-muted)', fontWeight: 600 }}>Date & Time</th>
-                  <th style={{ padding: '14px 18px', color: 'var(--text-muted)', fontWeight: 600 }}>Original Signs</th>
-                  <th style={{ padding: '14px 18px', color: 'var(--text-muted)', fontWeight: 600 }}>Confirmed Sentence</th>
-                  <th style={{ padding: '14px 18px', color: 'var(--text-muted)', fontWeight: 600 }}>Telugu Script (తెలుగు)</th>
-                  <th style={{ padding: '14px 18px', color: 'var(--text-muted)', fontWeight: 600 }}>Romanized Telugu</th>
-                  <th style={{ padding: '14px 18px', color: 'var(--text-muted)', fontWeight: 600, textAlign: 'right' }}>Actions</th>
+                <tr style={{ borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                  <th style={{ padding: '12px 16px', color: '#475569', fontWeight: 600 }}>Date & Time</th>
+                  <th style={{ padding: '12px 16px', color: '#475569', fontWeight: 600 }}>Original Signs</th>
+                  <th style={{ padding: '12px 16px', color: '#475569', fontWeight: 600 }}>Confirmed Sentence</th>
+                  <th style={{ padding: '12px 16px', color: '#475569', fontWeight: 600 }}>Telugu Script (తెలుగు)</th>
+                  <th style={{ padding: '12px 16px', color: '#475569', fontWeight: 600 }}>Romanized Telugu</th>
+                  <th style={{ padding: '12px 16px', color: '#475569', fontWeight: 600, textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {sentences.map((row) => (
                   <tr
                     key={row.id}
-                    style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)', transition: 'background 0.2s' }}
+                    style={{ borderBottom: '1px solid #e2e8f0', transition: 'background 0.15s' }}
                   >
-                    <td style={{ padding: '14px 18px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', fontSize: '0.8rem' }}>
+                    <td style={{ padding: '12px 16px', color: '#64748b', whiteSpace: 'nowrap', fontSize: '0.8rem' }}>
                       {new Date(row.created_at).toLocaleString([], {
                         month: 'short',
                         day: 'numeric',
@@ -256,42 +259,42 @@ export const HistoryLog: React.FC = () => {
                         minute: '2-digit'
                       })}
                     </td>
-                    <td style={{ padding: '14px 18px' }}>
+                    <td style={{ padding: '12px 16px' }}>
                       <span className="badge badge-primary" style={{ fontSize: '0.72rem' }}>
                         {row.original_signs}
                       </span>
                     </td>
-                    <td style={{ padding: '14px 18px', color: '#ffffff', fontWeight: 600, fontSize: '0.95rem' }}>
+                    <td style={{ padding: '12px 16px', color: '#0f172a', fontWeight: 600, fontSize: '0.92rem' }}>
                       {row.confirmed_sentence}
                     </td>
-                    <td style={{ padding: '14px 18px', color: row.telugu_output ? '#67e8f9' : 'var(--text-muted)', fontWeight: row.telugu_output ? 600 : 400, fontFamily: '"Anek Telugu", "Noto Sans Telugu", sans-serif' }}>
+                    <td style={{ padding: '12px 16px', color: row.telugu_output ? '#0284c7' : '#94a3b8', fontWeight: row.telugu_output ? 600 : 400, fontFamily: '"Anek Telugu", "Noto Sans Telugu", sans-serif' }}>
                       {row.telugu_output || <span style={{ fontStyle: 'italic', fontSize: '0.8rem' }}>Translation unavailable</span>}
                     </td>
-                    <td style={{ padding: '14px 18px', color: '#c7d2fe', fontStyle: 'italic', fontSize: '0.82rem' }}>
+                    <td style={{ padding: '12px 16px', color: '#475569', fontStyle: 'italic', fontSize: '0.82rem' }}>
                       {row.romanized_output || '—'}
                     </td>
-                    <td style={{ padding: '14px 18px', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                      <div style={{ display: 'inline-flex', gap: '6px' }}>
+                    <td style={{ padding: '12px 16px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                      <div style={{ display: 'inline-flex', gap: '4px' }}>
                         <button
                           className="btn btn-secondary"
                           onClick={() => handleCopy(row.confirmed_sentence, row.id)}
-                          style={{ padding: '5px 8px', fontSize: '0.75rem' }}
+                          style={{ padding: '4px 8px', fontSize: '0.75rem' }}
                           title="Copy confirmed sentence"
                         >
-                          {copiedId === row.id ? <Check size={13} color="#10b981" /> : <Copy size={13} />}
+                          {copiedId === row.id ? <Check size={13} color="#059669" /> : <Copy size={13} />}
                         </button>
                         <button
                           className="btn btn-secondary"
                           onClick={() => handleSpeak(row.confirmed_sentence, 'en')}
-                          style={{ padding: '5px 8px', fontSize: '0.75rem' }}
+                          style={{ padding: '4px 8px', fontSize: '0.75rem' }}
                           title="Speak sentence"
                         >
-                          <Volume2 size={13} color="#818cf8" />
+                          <Volume2 size={13} color="#2563eb" />
                         </button>
                         <button
                           className="btn btn-secondary"
                           onClick={() => handleDeleteSingleSentence(row.id)}
-                          style={{ padding: '5px 8px', fontSize: '0.75rem', color: '#f87171' }}
+                          style={{ padding: '4px 8px', fontSize: '0.75rem', color: '#e11d48' }}
                           title="Delete this sentence record"
                         >
                           <Trash2 size={13} />
@@ -308,53 +311,53 @@ export const HistoryLog: React.FC = () => {
         /* Raw Gesture Detections View */
         gestures.length === 0 ? (
           <div className="glass-panel" style={{ padding: '48px', textAlign: 'center' }}>
-            <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'rgba(255, 255, 255, 0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px auto' }}>
-              <Clock size={28} color="#94a3b8" />
+            <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px auto' }}>
+              <Clock size={24} color="#2563eb" />
             </div>
-            <h3 style={{ fontSize: '1.15rem', marginBottom: '6px' }}>No Gesture Detections Yet</h3>
-            <p style={{ fontSize: '0.86rem', color: 'var(--text-secondary)', maxWidth: '340px', margin: '0 auto' }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#0f172a', marginBottom: '6px' }}>No Gesture Detections Yet</h3>
+            <p style={{ fontSize: '0.86rem', color: '#64748b', maxWidth: '340px', margin: '0 auto' }}>
               Signs recognized through the camera will appear here.
             </p>
           </div>
         ) : (
-          <div className="glass-panel" style={{ overflowX: 'auto', borderRadius: '12px' }}>
+          <div className="glass-panel" style={{ overflowX: 'auto', borderRadius: '8px' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
               <thead>
-                <tr style={{ borderBottom: '1px solid var(--border-subtle)', background: 'rgba(255, 255, 255, 0.02)' }}>
-                  <th style={{ padding: '14px 18px', color: 'var(--text-muted)', fontWeight: 600 }}>Time</th>
-                  <th style={{ padding: '14px 18px', color: 'var(--text-muted)', fontWeight: 600 }}>Sign Label</th>
-                  <th style={{ padding: '14px 18px', color: 'var(--text-muted)', fontWeight: 600 }}>Meaning</th>
-                  <th style={{ padding: '14px 18px', color: 'var(--text-muted)', fontWeight: 600 }}>Confidence</th>
-                  <th style={{ padding: '14px 18px', color: 'var(--text-muted)', fontWeight: 600 }}>Storage Source</th>
+                <tr style={{ borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                  <th style={{ padding: '12px 16px', color: '#475569', fontWeight: 600 }}>Time</th>
+                  <th style={{ padding: '12px 16px', color: '#475569', fontWeight: 600 }}>Sign Label</th>
+                  <th style={{ padding: '12px 16px', color: '#475569', fontWeight: 600 }}>Meaning</th>
+                  <th style={{ padding: '12px 16px', color: '#475569', fontWeight: 600 }}>Confidence</th>
+                  <th style={{ padding: '12px 16px', color: '#475569', fontWeight: 600 }}>Storage Source</th>
                 </tr>
               </thead>
               <tbody>
                 {gestures.map((row) => (
                   <tr
                     key={row.id}
-                    style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)', transition: 'background 0.2s' }}
+                    style={{ borderBottom: '1px solid #e2e8f0', transition: 'background 0.15s' }}
                   >
-                    <td style={{ padding: '14px 18px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                    <td style={{ padding: '12px 16px', color: '#64748b', whiteSpace: 'nowrap' }}>
                       {new Date(row.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                     </td>
-                    <td style={{ padding: '14px 18px', fontWeight: 600 }}>
+                    <td style={{ padding: '12px 16px', fontWeight: 600 }}>
                       <span className="badge badge-primary" style={{ fontSize: '0.75rem' }}>
                         {row.predicted_label}
                       </span>
                     </td>
-                    <td style={{ padding: '14px 18px', color: '#ffffff', fontWeight: 600 }}>
+                    <td style={{ padding: '12px 16px', color: '#0f172a', fontWeight: 600 }}>
                       {row.english_meaning}
                     </td>
-                    <td style={{ padding: '14px 18px' }}>
+                    <td style={{ padding: '12px 16px' }}>
                       {row.confidence !== null && row.confidence !== undefined ? (
-                        <span style={{ color: '#34d399', fontWeight: 700 }}>
+                        <span style={{ color: '#059669', fontWeight: 700 }}>
                           {Math.round(row.confidence * 100)}%
                         </span>
                       ) : (
-                        <span style={{ color: 'var(--text-muted)' }}>N/A</span>
+                        <span style={{ color: '#94a3b8' }}>N/A</span>
                       )}
                     </td>
-                    <td style={{ padding: '14px 18px' }}>
+                    <td style={{ padding: '12px 16px' }}>
                       <span className="badge badge-neutral" style={{ fontSize: '0.72rem' }}>
                         {row.storage_source === 'supabase' ? 'Cloud' : 'Local SQLite'}
                       </span>

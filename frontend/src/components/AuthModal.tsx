@@ -66,33 +66,74 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       role="dialog"
       aria-modal="true"
       aria-labelledby="auth-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 50,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '16px',
+        backgroundColor: 'rgba(15, 23, 42, 0.45)',
+        backdropFilter: 'blur(3px)'
+      }}
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden p-6 relative"
+        style={{
+          width: '100%',
+          maxWidth: '440px',
+          backgroundColor: '#ffffff',
+          border: '1px solid #e2e8f0',
+          borderRadius: '12px',
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.08)',
+          overflow: 'hidden',
+          padding: '24px',
+          position: 'relative'
+        }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close Button */}
         <button
           onClick={onClose}
           aria-label="Close dialog"
-          className="absolute top-4 right-4 p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+          style={{
+            position: 'absolute',
+            top: '16px',
+            right: '16px',
+            padding: '6px',
+            color: '#64748b',
+            background: 'transparent',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer'
+          }}
         >
-          <X className="w-5 h-5" />
+          <X size={18} />
         </button>
 
         {/* Modal Header */}
-        <div className="mb-6">
-          <div className="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 mb-3">
-            <Lock className="w-6 h-6" />
+        <div style={{ marginBottom: '20px' }}>
+          <div style={{
+            width: '42px',
+            height: '42px',
+            borderRadius: '8px',
+            backgroundColor: '#eff6ff',
+            border: '1px solid #bfdbfe',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#2563eb',
+            marginBottom: '12px'
+          }}>
+            <Lock size={20} />
           </div>
-          <h2 id="auth-modal-title" className="text-2xl font-bold text-white">
+          <h2 id="auth-modal-title" style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
             {mode === 'login' && 'Sign in to SignBridge'}
             {mode === 'register' && 'Create your account'}
             {mode === 'recovery' && 'Reset your password'}
           </h2>
-          <p className="text-sm text-slate-400 mt-1">
+          <p style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '4px', marginBottom: 0 }}>
             {mode === 'login' && 'Access your personalized history and export sentence logs.'}
             {mode === 'register' && 'Save and sync your recognized sign sentences securely.'}
             {mode === 'recovery' && 'Enter your email to receive recovery instructions.'}
@@ -103,9 +144,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         {errorMsg && (
           <div
             role="alert"
-            className="mb-4 p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-300 text-sm flex items-start gap-2.5"
+            style={{
+              marginBottom: '14px',
+              padding: '10px 12px',
+              backgroundColor: '#fff1f2',
+              border: '1px solid #fecdd3',
+              borderRadius: '8px',
+              color: '#be123c',
+              fontSize: '0.82rem',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '8px'
+            }}
           >
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+            <AlertCircle size={15} style={{ flexShrink: 0, marginTop: '2px' }} />
             <span>{errorMsg}</span>
           </div>
         )}
@@ -113,76 +165,114 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         {successMsg && (
           <div
             role="status"
-            className="mb-4 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-300 text-sm flex items-start gap-2.5"
+            style={{
+              marginBottom: '14px',
+              padding: '10px 12px',
+              backgroundColor: '#ecfdf5',
+              border: '1px solid #a7f3d0',
+              borderRadius: '8px',
+              color: '#047857',
+              fontSize: '0.82rem',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '8px'
+            }}
           >
-            <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
+            <CheckCircle2 size={15} style={{ flexShrink: 0, marginTop: '2px' }} />
             <span>{successMsg}</span>
           </div>
         )}
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {mode === 'register' && (
             <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '6px' }}>
                 Full or Display Name
               </label>
-              <div className="relative">
-                <User className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+              <div style={{ position: 'relative' }}>
+                <User size={15} style={{ position: 'absolute', left: '12px', top: '12px', color: '#94a3b8' }} />
                 <input
                   type="text"
                   required
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
                   placeholder="e.g., Alex Johnson"
-                  className="w-full bg-slate-800/80 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                  style={{
+                    width: '100%',
+                    paddingLeft: '36px',
+                    paddingRight: '12px',
+                    paddingTop: '9px',
+                    paddingBottom: '9px',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.88rem'
+                  }}
                 />
               </div>
             </div>
           )}
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '6px' }}>
               Email Address
             </label>
-            <div className="relative">
-              <Mail className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+            <div style={{ position: 'relative' }}>
+              <Mail size={15} style={{ position: 'absolute', left: '12px', top: '12px', color: '#94a3b8' }} />
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
-                className="w-full bg-slate-800/80 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                style={{
+                  width: '100%',
+                  paddingLeft: '36px',
+                  paddingRight: '12px',
+                  paddingTop: '9px',
+                  paddingBottom: '9px',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '0.88rem'
+                }}
               />
             </div>
           </div>
 
           {mode !== 'recovery' && (
             <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
                   Password
                 </label>
                 {mode === 'login' && (
                   <button
                     type="button"
                     onClick={() => { setMode('recovery'); setErrorMsg(null); setSuccessMsg(null); }}
-                    className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+                    style={{ fontSize: '0.75rem', color: '#2563eb', background: 'transparent', border: 'none', cursor: 'pointer', fontWeight: 500 }}
                   >
                     Forgot password?
                   </button>
                 )}
               </div>
-              <div className="relative">
-                <Lock className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+              <div style={{ position: 'relative' }}>
+                <Lock size={15} style={{ position: 'absolute', left: '12px', top: '12px', color: '#94a3b8' }} />
                 <input
                   type="password"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder={mode === 'register' ? 'Minimum 6 characters' : 'Enter password'}
-                  className="w-full bg-slate-800/80 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                  style={{
+                    width: '100%',
+                    paddingLeft: '36px',
+                    paddingRight: '12px',
+                    paddingTop: '9px',
+                    paddingBottom: '9px',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.88rem'
+                  }}
                 />
               </div>
             </div>
@@ -190,15 +280,24 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
           {mode === 'register' && (
             <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '6px' }}>
                 Preferred Output Language
               </label>
-              <div className="relative">
-                <Globe className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+              <div style={{ position: 'relative' }}>
+                <Globe size={15} style={{ position: 'absolute', left: '12px', top: '12px', color: '#94a3b8' }} />
                 <select
                   value={preferredLanguage}
                   onChange={(e) => setPreferredLanguage(e.target.value)}
-                  className="w-full bg-slate-800/80 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                  style={{
+                    width: '100%',
+                    paddingLeft: '36px',
+                    paddingRight: '12px',
+                    paddingTop: '9px',
+                    paddingBottom: '9px',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.88rem'
+                  }}
                 >
                   <option value="en">English</option>
                   <option value="te">Telugu Script (తెలుగు)</option>
@@ -211,10 +310,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 px-4 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-medium rounded-xl shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+            className="btn btn-primary"
+            style={{ width: '100%', padding: '10px 16px', fontSize: '0.92rem', marginTop: '6px' }}
           >
             {loading ? (
-              <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              <span>Processing...</span>
             ) : (
               <>
                 <span>
@@ -222,32 +322,32 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   {mode === 'register' && 'Create Account'}
                   {mode === 'recovery' && 'Send Recovery Email'}
                 </span>
-                <ArrowRight className="w-4 h-4" />
+                <ArrowRight size={15} />
               </>
             )}
           </button>
         </form>
 
         {/* Footer Switcher */}
-        <div className="mt-6 pt-5 border-t border-slate-800 text-center text-sm text-slate-400">
+        <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid #e2e8f0', textAlign: 'center', fontSize: '0.84rem', color: '#64748b' }}>
           {mode === 'login' ? (
-            <p>
+            <p style={{ margin: 0 }}>
               Don't have an account?{' '}
               <button
                 type="button"
                 onClick={() => { setMode('register'); setErrorMsg(null); setSuccessMsg(null); }}
-                className="text-indigo-400 hover:text-indigo-300 font-medium ml-1 transition-colors"
+                style={{ color: '#2563eb', fontWeight: 600, background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}
               >
                 Create one now
               </button>
             </p>
           ) : (
-            <p>
+            <p style={{ margin: 0 }}>
               Already have an account?{' '}
               <button
                 type="button"
                 onClick={() => { setMode('login'); setErrorMsg(null); setSuccessMsg(null); }}
-                className="text-indigo-400 hover:text-indigo-300 font-medium ml-1 transition-colors"
+                style={{ color: '#2563eb', fontWeight: 600, background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}
               >
                 Sign in here
               </button>

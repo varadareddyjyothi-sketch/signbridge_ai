@@ -388,21 +388,22 @@ export const ISLGuide: React.FC<ISLGuideProps> = ({
             style={{
               width: '36px',
               height: '36px',
-              borderRadius: '10px',
-              background: 'linear-gradient(135deg, #6366f1 0%, #06b6d4 100%)',
+              borderRadius: '8px',
+              background: '#2563eb',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 0 14px rgba(99, 102, 241, 0.35)'
+              color: '#ffffff',
+              boxShadow: '0 1px 2px rgba(37, 99, 235, 0.2)'
             }}
           >
-            <BookOpen size={20} color="#ffffff" />
+            <BookOpen size={18} color="#ffffff" />
           </div>
-          <h1 style={{ fontSize: '1.6rem', fontWeight: 800, letterSpacing: '-0.02em', margin: 0 }}>
+          <h1 style={{ fontSize: '1.6rem', fontWeight: 800, letterSpacing: '-0.02em', color: '#0f172a', margin: 0 }}>
             Indian Sign Language Guide
           </h1>
         </div>
-        <p style={{ fontSize: '0.92rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>
+        <p style={{ fontSize: '0.92rem', color: '#64748b', margin: 0, lineHeight: 1.5 }}>
           Learn signs, practise them with your camera, and see supported recognition results.
         </p>
       </div>
@@ -413,21 +414,22 @@ export const ISLGuide: React.FC<ISLGuideProps> = ({
       <div
         className="glass-panel"
         style={{
-          padding: '16px 20px',
+          padding: '14px 18px',
           marginBottom: '20px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           flexWrap: 'wrap',
-          gap: '14px'
+          gap: '14px',
+          borderRadius: '10px'
         }}
       >
         {/* Search Field */}
         <div style={{ position: 'relative', flex: '1 1 280px', minWidth: '220px' }}>
           <Search
             size={18}
-            color="var(--text-muted)"
-            style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }}
+            color="#94a3b8"
+            style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }}
           />
           <input
             type="text"
@@ -437,8 +439,8 @@ export const ISLGuide: React.FC<ISLGuideProps> = ({
             placeholder="Search signs by name or English / Telugu meaning..."
             aria-label="Search signs"
             style={{
-              paddingLeft: '40px',
-              paddingRight: searchQuery ? '38px' : '14px',
+              paddingLeft: '38px',
+              paddingRight: searchQuery ? '38px' : '12px',
               width: '100%',
               fontSize: '0.88rem'
             }}
@@ -454,7 +456,7 @@ export const ISLGuide: React.FC<ISLGuideProps> = ({
                 transform: 'translateY(-50%)',
                 background: 'transparent',
                 border: 'none',
-                color: 'var(--text-muted)',
+                color: '#64748b',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
@@ -468,55 +470,64 @@ export const ISLGuide: React.FC<ISLGuideProps> = ({
 
         {/* Language Display Selector */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Globe size={16} color="var(--text-muted)" />
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Display:</span>
+          <Globe size={16} color="#64748b" />
+          <span style={{ fontSize: '0.8rem', color: '#475569', fontWeight: 600 }}>Display:</span>
           <div
             style={{
               display: 'flex',
-              background: 'rgba(15, 23, 42, 0.6)',
-              borderRadius: '8px',
-              padding: '3px',
-              border: '1px solid var(--border-subtle)'
+              background: '#f1f5f9',
+              borderRadius: '6px',
+              padding: '2px',
+              border: '1px solid #e2e8f0'
             }}
           >
             <button
-              className="btn"
               onClick={() => setSelectedLanguage('en')}
               style={{
                 padding: '4px 10px',
                 fontSize: '0.78rem',
-                borderRadius: '6px',
-                background: selectedLanguage === 'en' ? 'var(--primary)' : 'transparent',
-                color: selectedLanguage === 'en' ? '#ffffff' : 'var(--text-secondary)',
-                border: 'none'
+                fontWeight: 600,
+                borderRadius: '5px',
+                background: selectedLanguage === 'en' ? '#ffffff' : 'transparent',
+                color: selectedLanguage === 'en' ? '#1d4ed8' : '#475569',
+                border: '1px solid',
+                borderColor: selectedLanguage === 'en' ? '#bfdbfe' : 'transparent',
+                boxShadow: selectedLanguage === 'en' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
+                cursor: 'pointer'
               }}
             >
               English
             </button>
             <button
-              className="btn"
               onClick={() => setSelectedLanguage('te')}
               style={{
                 padding: '4px 10px',
                 fontSize: '0.78rem',
-                borderRadius: '6px',
-                background: selectedLanguage === 'te' ? 'var(--primary)' : 'transparent',
-                color: selectedLanguage === 'te' ? '#ffffff' : 'var(--text-secondary)',
-                border: 'none'
+                fontWeight: 600,
+                borderRadius: '5px',
+                background: selectedLanguage === 'te' ? '#ffffff' : 'transparent',
+                color: selectedLanguage === 'te' ? '#1d4ed8' : '#475569',
+                border: '1px solid',
+                borderColor: selectedLanguage === 'te' ? '#bfdbfe' : 'transparent',
+                boxShadow: selectedLanguage === 'te' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
+                cursor: 'pointer'
               }}
             >
               తెలుగు
             </button>
             <button
-              className="btn"
               onClick={() => setSelectedLanguage('ro')}
               style={{
                 padding: '4px 10px',
                 fontSize: '0.78rem',
-                borderRadius: '6px',
-                background: selectedLanguage === 'ro' ? 'var(--primary)' : 'transparent',
-                color: selectedLanguage === 'ro' ? '#ffffff' : 'var(--text-secondary)',
-                border: 'none'
+                fontWeight: 600,
+                borderRadius: '5px',
+                background: selectedLanguage === 'ro' ? '#ffffff' : 'transparent',
+                color: selectedLanguage === 'ro' ? '#1d4ed8' : '#475569',
+                border: '1px solid',
+                borderColor: selectedLanguage === 'ro' ? '#bfdbfe' : 'transparent',
+                boxShadow: selectedLanguage === 'ro' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
+                cursor: 'pointer'
               }}
             >
               Romanized
@@ -691,32 +702,32 @@ export const ISLGuide: React.FC<ISLGuideProps> = ({
                   </div>
 
                   {/* Sign Name */}
-                  <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#ffffff', marginBottom: '8px' }}>
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#0f172a', marginBottom: '8px' }}>
                     {sign.name}
                   </h3>
 
                   {/* Meaning */}
-                  <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', marginBottom: '14px', lineHeight: 1.45 }}>
-                    <strong style={{ color: '#e0e7ff', fontWeight: 600 }}>Meaning: </strong>
+                  <p style={{ fontSize: '0.88rem', color: '#475569', marginBottom: '14px', lineHeight: 1.45 }}>
+                    <strong style={{ color: '#0f172a', fontWeight: 600 }}>Meaning: </strong>
                     {displayedMeaning}
                   </p>
 
                   {/* Visual Demonstration Status Notice */}
                   <div
                     style={{
-                      background: 'rgba(15, 23, 42, 0.5)',
+                      background: '#f8fafc',
                       borderRadius: '8px',
                       padding: '10px 12px',
                       fontSize: '0.78rem',
-                      color: 'var(--text-muted)',
-                      border: '1px solid rgba(255, 255, 255, 0.04)',
+                      color: '#64748b',
+                      border: '1px solid #e2e8f0',
                       marginBottom: '16px',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '8px'
                     }}
                   >
-                    <HelpCircle size={14} color="#818cf8" style={{ flexShrink: 0 }} />
+                    <HelpCircle size={14} color="#2563eb" style={{ flexShrink: 0 }} />
                     <span>Visual demo being recorded by certified ISL instructors</span>
                   </div>
                 </div>
@@ -794,12 +805,9 @@ export const ISLGuide: React.FC<ISLGuideProps> = ({
         <div
           style={{
             position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(3, 7, 18, 0.85)',
-            backdropFilter: 'blur(8px)',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.45)',
+            backdropFilter: 'blur(3px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -816,12 +824,13 @@ export const ISLGuide: React.FC<ISLGuideProps> = ({
             style={{
               maxWidth: '560px',
               width: '100%',
-              borderRadius: '16px',
-              padding: '26px',
+              borderRadius: '12px',
+              padding: '24px',
               maxHeight: '90vh',
               overflowY: 'auto',
-              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.5)',
-              border: '1px solid var(--border-glow)'
+              background: '#ffffff',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.08)',
+              border: '1px solid #e2e8f0'
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -854,7 +863,7 @@ export const ISLGuide: React.FC<ISLGuideProps> = ({
             </div>
 
             {/* Title */}
-            <h2 id="modal-sign-title" style={{ fontSize: '1.45rem', fontWeight: 800, color: '#ffffff', marginBottom: '16px' }}>
+            <h2 id="modal-sign-title" style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a', marginBottom: '14px' }}>
               {activeSignDetail.name}
             </h2>
 
@@ -862,50 +871,51 @@ export const ISLGuide: React.FC<ISLGuideProps> = ({
             <div
               style={{
                 width: '100%',
-                background: '#090d16',
-                border: '1px dashed rgba(255, 255, 255, 0.12)',
-                borderRadius: '12px',
-                padding: '24px 18px',
+                background: '#f8fafc',
+                border: '1px dashed #cbd5e1',
+                borderRadius: '10px',
+                padding: '20px 16px',
                 textAlign: 'center',
-                marginBottom: '20px'
+                marginBottom: '18px'
               }}
             >
               <div
                 style={{
-                  width: '48px',
-                  height: '48px',
-                  borderRadius: '12px',
-                  background: 'rgba(99, 102, 241, 0.12)',
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '10px',
+                  background: '#eff6ff',
+                  border: '1px solid #bfdbfe',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   margin: '0 auto 10px auto'
                 }}
               >
-                <BookOpen size={24} color="#818cf8" />
+                <BookOpen size={20} color="#2563eb" />
               </div>
-              <p style={{ fontSize: '0.88rem', fontWeight: 600, color: '#c7d2fe', marginBottom: '4px' }}>
+              <p style={{ fontSize: '0.88rem', fontWeight: 600, color: '#0f172a', marginBottom: '3px' }}>
                 Official ISL Video Demonstration in Preparation
               </p>
-              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0, maxWidth: '380px', marginInline: 'auto' }}>
+              <p style={{ fontSize: '0.78rem', color: '#64748b', margin: 0, maxWidth: '380px', marginInline: 'auto' }}>
                 Certified video demonstrations are being produced with native signers. Please follow the verified handshape instructions below.
               </p>
             </div>
 
             {/* Performing Instructions */}
-            <div style={{ marginBottom: '20px' }}>
-              <h4 style={{ fontSize: '0.82rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#a5b4fc', marginBottom: '8px', fontWeight: 700 }}>
+            <div style={{ marginBottom: '18px' }}>
+              <h4 style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.04em', color: '#2563eb', marginBottom: '8px', fontWeight: 700 }}>
                 How to Perform This Sign
               </h4>
               <div
                 style={{
-                  background: 'rgba(15, 23, 42, 0.6)',
-                  border: '1px solid var(--border-subtle)',
-                  borderRadius: '10px',
-                  padding: '14px 16px',
-                  fontSize: '0.9rem',
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '8px',
+                  padding: '12px 14px',
+                  fontSize: '0.88rem',
                   lineHeight: 1.6,
-                  color: '#ffffff'
+                  color: '#0f172a'
                 }}
               >
                 {activeSignDetail.instructions}
@@ -913,17 +923,17 @@ export const ISLGuide: React.FC<ISLGuideProps> = ({
             </div>
 
             {/* Multilingual Meanings */}
-            <div style={{ marginBottom: '22px' }}>
-              <h4 style={{ fontSize: '0.82rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#a5b4fc', marginBottom: '10px', fontWeight: 700 }}>
+            <div style={{ marginBottom: '20px' }}>
+              <h4 style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.04em', color: '#2563eb', marginBottom: '8px', fontWeight: 700 }}>
                 Meanings & Translations
               </h4>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {/* English */}
                 <div
                   style={{
-                    background: 'rgba(15, 23, 42, 0.4)',
-                    border: '1px solid var(--border-subtle)',
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
                     borderRadius: '8px',
                     padding: '10px 14px',
                     display: 'flex',
@@ -933,12 +943,12 @@ export const ISLGuide: React.FC<ISLGuideProps> = ({
                   }}
                 >
                   <div>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>English:</span>
-                    <div style={{ fontSize: '0.92rem', color: '#ffffff', fontWeight: 600 }}>
+                    <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>English:</span>
+                    <div style={{ fontSize: '0.92rem', color: '#0f172a', fontWeight: 600 }}>
                       {activeSignDetail.englishMeaning}
                     </div>
                     {activeSignDetail.exampleEn && (
-                      <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                      <div style={{ fontSize: '0.78rem', color: '#475569', marginTop: '2px' }}>
                         Example: "{activeSignDetail.exampleEn}"
                       </div>
                     )}
@@ -950,15 +960,15 @@ export const ISLGuide: React.FC<ISLGuideProps> = ({
                     aria-label="Speak English meaning"
                     style={{ padding: '6px', borderRadius: '6px' }}
                   >
-                    <Volume2 size={16} />
+                    <Volume2 size={15} color="#2563eb" />
                   </button>
                 </div>
 
                 {/* Telugu Script */}
                 <div
                   style={{
-                    background: 'rgba(15, 23, 42, 0.4)',
-                    border: '1px solid var(--border-subtle)',
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
                     borderRadius: '8px',
                     padding: '10px 14px',
                     display: 'flex',
@@ -968,12 +978,12 @@ export const ISLGuide: React.FC<ISLGuideProps> = ({
                   }}
                 >
                   <div>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>తెలుగు (Telugu):</span>
-                    <div style={{ fontSize: '1rem', color: '#38bdf8', fontWeight: 600, fontFamily: 'sans-serif' }}>
+                    <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>తెలుగు (Telugu):</span>
+                    <div style={{ fontSize: '0.98rem', color: '#0284c7', fontWeight: 600, fontFamily: 'sans-serif' }}>
                       {activeSignDetail.teluguMeaning}
                     </div>
                     {activeSignDetail.exampleTe && (
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                      <div style={{ fontSize: '0.8rem', color: '#475569', marginTop: '2px' }}>
                         ఉదాహరణ: "{activeSignDetail.exampleTe}"
                       </div>
                     )}
@@ -985,25 +995,25 @@ export const ISLGuide: React.FC<ISLGuideProps> = ({
                     aria-label="Speak Telugu meaning"
                     style={{ padding: '6px', borderRadius: '6px' }}
                   >
-                    <Volume2 size={16} />
+                    <Volume2 size={15} color="#0284c7" />
                   </button>
                 </div>
 
                 {/* Romanized Telugu */}
                 <div
                   style={{
-                    background: 'rgba(15, 23, 42, 0.4)',
-                    border: '1px solid var(--border-subtle)',
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
                     borderRadius: '8px',
                     padding: '10px 14px'
                   }}
                 >
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>Telugu (Romanized):</span>
-                  <div style={{ fontSize: '0.88rem', color: '#c7d2fe', fontWeight: 500, fontStyle: 'italic' }}>
+                  <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>Telugu (Romanized):</span>
+                  <div style={{ fontSize: '0.88rem', color: '#334155', fontWeight: 500, fontStyle: 'italic' }}>
                     {activeSignDetail.teluguRomanized}
                   </div>
                   {activeSignDetail.exampleRo && (
-                    <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                    <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '2px' }}>
                       Pronunciation: "{activeSignDetail.exampleRo}"
                     </div>
                   )}

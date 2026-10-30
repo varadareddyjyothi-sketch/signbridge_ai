@@ -70,33 +70,75 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
       role="dialog"
       aria-modal="true"
       aria-labelledby="profile-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 50,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '16px',
+        backgroundColor: 'rgba(15, 23, 42, 0.45)',
+        backdropFilter: 'blur(3px)'
+      }}
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden p-6 relative"
+        style={{
+          width: '100%',
+          maxWidth: '440px',
+          backgroundColor: '#ffffff',
+          border: '1px solid #e2e8f0',
+          borderRadius: '12px',
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.08)',
+          overflow: 'hidden',
+          padding: '24px',
+          position: 'relative'
+        }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close Button */}
         <button
           onClick={onClose}
           aria-label="Close profile"
-          className="absolute top-4 right-4 p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+          style={{
+            position: 'absolute',
+            top: '16px',
+            right: '16px',
+            padding: '6px',
+            color: '#64748b',
+            background: 'transparent',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer'
+          }}
         >
-          <X className="w-5 h-5" />
+          <X size={18} />
         </button>
 
         {/* Modal Header */}
-        <div className="flex items-center gap-3.5 mb-6">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg shadow-md shadow-indigo-500/20">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+          <div style={{
+            width: '44px',
+            height: '44px',
+            borderRadius: '10px',
+            backgroundColor: '#2563eb',
+            color: '#ffffff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontWeight: 800,
+            fontSize: '1.1rem',
+            boxShadow: '0 2px 4px rgba(37, 99, 235, 0.2)'
+          }}>
             {user.display_name.charAt(0).toUpperCase()}
           </div>
           <div>
-            <h2 id="profile-modal-title" className="text-xl font-bold text-white leading-tight">
+            <h2 id="profile-modal-title" style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: 0, lineHeight: 1.3 }}>
               {user.display_name}
             </h2>
-            <div className="flex items-center gap-1.5 text-xs text-slate-400 mt-0.5">
-              <Mail className="w-3.5 h-3.5" />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.8rem', color: '#64748b', marginTop: '2px' }}>
+              <Mail size={13} />
               <span>{user.email}</span>
             </div>
           </div>
@@ -106,65 +148,101 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
         {statusMsg && (
           <div
             role={statusMsg.type === 'error' ? 'alert' : 'status'}
-            className={`mb-4 p-3 rounded-xl text-sm flex items-start gap-2.5 ${
-              statusMsg.type === 'success'
-                ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-300'
-                : 'bg-rose-500/10 border border-rose-500/30 text-rose-300'
-            }`}
+            style={{
+              marginBottom: '14px',
+              padding: '10px 12px',
+              borderRadius: '8px',
+              fontSize: '0.82rem',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '8px',
+              backgroundColor: statusMsg.type === 'success' ? '#ecfdf5' : '#fff1f2',
+              border: `1px solid ${statusMsg.type === 'success' ? '#a7f3d0' : '#fecdd3'}`,
+              color: statusMsg.type === 'success' ? '#047857' : '#be123c'
+            }}
           >
             {statusMsg.type === 'success' ? (
-              <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
+              <CheckCircle2 size={15} style={{ flexShrink: 0, marginTop: '2px' }} />
             ) : (
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <AlertCircle size={15} style={{ flexShrink: 0, marginTop: '2px' }} />
             )}
             <span>{statusMsg.text}</span>
           </div>
         )}
 
         {/* Account Details Box */}
-        <div className="p-3.5 bg-slate-800/50 border border-slate-700/50 rounded-xl space-y-2 mb-5 text-xs text-slate-400">
-          <div className="flex items-center justify-between">
-            <span className="flex items-center gap-1.5">
-              <Calendar className="w-3.5 h-3.5 text-slate-400" />
+        <div style={{
+          padding: '12px 14px',
+          backgroundColor: '#f8fafc',
+          border: '1px solid #e2e8f0',
+          borderRadius: '8px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px',
+          marginBottom: '18px',
+          fontSize: '0.8rem',
+          color: '#64748b'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Calendar size={13} color="#64748b" />
               Member Since
             </span>
-            <span className="text-slate-200 font-medium">{formattedDate}</span>
+            <span style={{ color: '#0f172a', fontWeight: 600 }}>{formattedDate}</span>
           </div>
-          <div className="flex items-center justify-between">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span>Account Security</span>
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <span className="badge badge-success" style={{ fontSize: '0.7rem' }}>
               PBKDF2 Salted Auth
             </span>
           </div>
         </div>
 
         {/* Edit Preferences Form */}
-        <form onSubmit={handleUpdate} className="space-y-4">
+        <form onSubmit={handleUpdate} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           <div>
-            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '6px' }}>
               Display Name
             </label>
-            <div className="relative">
-              <User className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+            <div style={{ position: 'relative' }}>
+              <User size={15} style={{ position: 'absolute', left: '12px', top: '12px', color: '#94a3b8' }} />
               <input
                 type="text"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                className="w-full bg-slate-800/80 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                style={{
+                  width: '100%',
+                  paddingLeft: '36px',
+                  paddingRight: '12px',
+                  paddingTop: '9px',
+                  paddingBottom: '9px',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '0.88rem'
+                }}
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '6px' }}>
               Default Output Language
             </label>
-            <div className="relative">
-              <Globe className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+            <div style={{ position: 'relative' }}>
+              <Globe size={15} style={{ position: 'absolute', left: '12px', top: '12px', color: '#94a3b8' }} />
               <select
                 value={preferredLanguage}
                 onChange={(e) => setPreferredLanguage(e.target.value)}
-                className="w-full bg-slate-800/80 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                style={{
+                  width: '100%',
+                  paddingLeft: '36px',
+                  paddingRight: '12px',
+                  paddingTop: '9px',
+                  paddingBottom: '9px',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '0.88rem'
+                }}
               >
                 <option value="en">English</option>
                 <option value="te">Telugu Script (తెలుగు)</option>
@@ -176,30 +254,42 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
           <button
             type="submit"
             disabled={saving}
-            className="w-full py-2.5 px-4 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white font-medium rounded-xl text-sm transition-colors flex items-center justify-center gap-2"
+            className="btn btn-primary"
+            style={{ width: '100%', padding: '9px 16px', fontSize: '0.9rem' }}
           >
             {saving ? 'Saving Changes...' : 'Save Preferences'}
           </button>
         </form>
 
         {/* Action Buttons: Excel Export & Sign Out */}
-        <div className="mt-6 pt-5 border-t border-slate-800 space-y-2.5">
+        <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <button
             type="button"
             onClick={handleExportExcel}
             disabled={exporting}
-            className="w-full py-2.5 px-4 bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 font-medium rounded-xl text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+            className="btn btn-secondary"
+            style={{
+              width: '100%',
+              padding: '9px 14px',
+              fontSize: '0.86rem',
+              background: '#ecfdf5',
+              borderColor: '#a7f3d0',
+              color: '#047857',
+              fontWeight: 600,
+              justifyContent: 'center'
+            }}
           >
-            <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+            <FileSpreadsheet size={15} />
             <span>{exporting ? 'Generating Excel Workbook...' : 'Export Sentence History to Excel (.xlsx)'}</span>
           </button>
 
           <button
             type="button"
             onClick={onLogout}
-            className="w-full py-2.5 px-4 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-300 font-medium rounded-xl text-sm transition-colors flex items-center justify-center gap-2"
+            className="btn btn-danger"
+            style={{ width: '100%', padding: '9px 14px', fontSize: '0.86rem', justifyContent: 'center' }}
           >
-            <LogOut className="w-4 h-4" />
+            <LogOut size={15} />
             <span>Sign Out</span>
           </button>
         </div>
