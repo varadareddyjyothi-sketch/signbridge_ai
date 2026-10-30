@@ -86,12 +86,13 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
       <div
         style={{
           width: '100%',
-          maxWidth: '440px',
+          maxWidth: 'min(440px, calc(100vw - 32px))',
+          maxHeight: 'calc(100vh - 32px)',
+          overflowY: 'auto',
           backgroundColor: '#ffffff',
           border: '1px solid #e2e8f0',
           borderRadius: '12px',
           boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.08)',
-          overflow: 'hidden',
           padding: '24px',
           position: 'relative'
         }}
@@ -115,6 +116,18 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
         >
           <X size={18} />
         </button>
+
+        {/* Brand Bar */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+          <img
+            src="/logo.png"
+            alt="SignBridge AI Logo"
+            style={{ width: '26px', height: '26px', borderRadius: '6px', objectFit: 'contain' }}
+          />
+          <span style={{ fontSize: '0.76rem', fontWeight: 700, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            SignBridge AI Account
+          </span>
+        </div>
 
         {/* Modal Header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>

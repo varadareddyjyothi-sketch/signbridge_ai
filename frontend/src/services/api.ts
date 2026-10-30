@@ -34,7 +34,7 @@ function getStoredToken(): string | null {
   }
 }
 
-async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 6000): Promise<Response> {
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 10000): Promise<Response> {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -51,6 +51,14 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutM
       signal: controller.signal
     });
     return response;
+  } catch (err: any) {
+    if (err?.name === 'AbortError') {
+      throw new Error('Server request timed out (10s). Please check your internet or backend connection.');
+    }
+    if (err?.message === 'Failed to fetch' || err instanceof TypeError) {
+      throw new Error('Cannot connect to SignBridge backend at ' + API_BASE + '. Please ensure the server is running on port 8000.');
+    }
+    throw err;
   } finally {
     clearTimeout(id);
   }
@@ -177,6 +185,17 @@ export const api = {
     });
     if (!res.ok) {
       throw new Error(`Failed to clear history: HTTP ${res.status}`);
+    }
+    return res.json();
+  },
+
+  async deleteHistory(id: string): Promise<{ success: boolean; deleted_id: string }> {
+    const res = await fetchWithTimeout(`${API_BASE}/history/${id}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: `Failed to delete record: HTTP ${res.status}` }));
+      throw new Error(err.detail || 'Failed to delete recognition record');
     }
     return res.json();
   },

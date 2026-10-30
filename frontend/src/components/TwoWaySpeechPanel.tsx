@@ -129,14 +129,15 @@ export const TwoWaySpeechPanel: React.FC = () => {
       )}
 
       {/* Partner Typing Form */}
-      <form onSubmit={handleSendTypedMessage} style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+      <form onSubmit={handleSendTypedMessage} style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
         <input
           type="text"
           value={typedMessage}
           onChange={(e) => setTypedMessage(e.target.value)}
-          placeholder="Type a message or response for the signer (e.g. 'Yes, I understand' or 'The bus arrives at 4 PM')..."
+          placeholder="Type a message or response for the signer..."
           style={{
-            flex: 1,
+            flex: '1 1 200px',
+            minWidth: 0,
             padding: '9px 12px',
             borderRadius: '6px',
             background: '#ffffff',

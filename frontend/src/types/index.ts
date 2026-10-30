@@ -35,13 +35,13 @@ export interface HistoryItem {
   confidence?: number | null;
   recognition_mode: string;
   created_at: string;
-  storage_source: 'supabase' | 'local_sqlite';
+  storage_source: 'mongodb' | 'local_sqlite' | string;
 }
 
 export interface HistoryResponse {
   items: HistoryItem[];
   total: number;
-  storage_mode: 'supabase' | 'local_sqlite';
+  storage_mode: 'mongodb' | 'local_sqlite' | string;
   cloud_connected: boolean;
 }
 
@@ -52,8 +52,9 @@ export interface HealthStatus {
   environment: string;
   model_status: 'unavailable' | 'experimental' | 'trained' | 'evaluated' | string;
   model_classes_count: number;
-  storage_mode: 'supabase' | 'local_sqlite' | string;
-  supabase_configured: boolean;
+  storage_mode: 'mongodb' | 'local_sqlite' | string;
+  mongodb_configured?: boolean;
+  mongodb_connected?: boolean;
   timestamp: string;
 }
 
@@ -194,13 +195,13 @@ export interface SentenceHistoryEntry {
   recognition_mode: string;
   source_mode?: 'camera_recognition' | 'quick_phrase' | string;
   created_at: string;
-  storage_source?: 'supabase' | 'local_sqlite' | string;
+  storage_source?: 'mongodb' | 'local_sqlite' | string;
 }
 
 export interface SentenceHistoryResponse {
   items: SentenceHistoryEntry[];
   total: number;
-  storage_mode: 'supabase' | 'local_sqlite' | string;
+  storage_mode: 'mongodb' | 'local_sqlite' | string;
   cloud_connected: boolean;
 }
 

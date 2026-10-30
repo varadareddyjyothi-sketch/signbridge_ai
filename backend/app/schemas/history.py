@@ -14,7 +14,7 @@ class HistoryEntry(BaseModel):
     confidence: Optional[float] = None
     recognition_mode: str = "static_isl"
     created_at: str
-    storage_source: str = Field(..., description="'supabase' or 'local_sqlite'")
+    storage_source: str = Field(..., description="'mongodb' or 'local_sqlite'")
 
 
 class HistoryCreateRequest(BaseModel):
@@ -28,7 +28,7 @@ class HistoryCreateRequest(BaseModel):
 class HistoryResponse(BaseModel):
     items: List[HistoryEntry]
     total: int
-    storage_mode: str = Field(..., description="'supabase' | 'local_sqlite'")
+    storage_mode: str = Field(..., description="'mongodb' | 'local_sqlite'")
     cloud_connected: bool
 
 

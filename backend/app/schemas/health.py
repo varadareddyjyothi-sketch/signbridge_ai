@@ -14,7 +14,8 @@ class HealthResponse(BaseModel):
     model_status: str
     model_classes_count: int
     storage_mode: str
-    supabase_configured: bool
+    mongodb_configured: bool = False
+    mongodb_connected: bool = False
     timestamp: str
 
 

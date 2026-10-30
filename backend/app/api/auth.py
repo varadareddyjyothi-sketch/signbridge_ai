@@ -1,20 +1,13 @@
 """
 SignBridge AI - Authentication and Profile Management Router
 Supports secure registration, login, profile updates, and logout.
-Works with SQLite local auth or Supabase when configured.
+Uses MongoDB (with local SQLite fallback) for secure token and credential management.
 """
 
 from typing import Optional
 from pydantic import BaseModel, Field
 from fastapi import APIRouter, HTTPException, Depends, Header
-from backend.app.database.local_storage import (
-    create_user,
-    authenticate_user,
-    get_user_by_token,
-    update_user_profile,
-    delete_session
-)
-from backend.app.database.supabase_client import get_supabase_client
+from backend.app.database.history_service import history_service
 
 router = APIRouter(prefix="/auth", tags=["Authentication & Profile"])
 
@@ -70,28 +63,8 @@ def get_current_user_optional(authorization: Optional[str] = Header(None)) -> Op
     if not token:
         return None
 
-    # Check local SQLite session
-    user = get_user_by_token(token)
-    if user:
-        return user
-
-    # Check Supabase auth if configured
-    client = get_supabase_client()
-    if client:
-        try:
-            res = client.auth.get_user(token)
-            if res.user:
-                return {
-                    "id": res.user.id,
-                    "email": res.user.email,
-                    "display_name": res.user.user_metadata.get("display_name", res.user.email.split("@")[0]),
-                    "preferred_language": res.user.user_metadata.get("preferred_language", "en"),
-                    "created_at": str(res.user.created_at)
-                }
-        except Exception:
-            pass
-
-    return None
+    # Check MongoDB / SQLite session
+    return history_service.get_user_by_token(token)
 
 
 def get_current_user_required(authorization: Optional[str] = Header(None)) -> dict:
@@ -111,13 +84,13 @@ async def register(request: UserRegisterRequest):
     Registers a new user with salted hashed password and returns an auth session.
     """
     try:
-        user = create_user(
+        user = history_service.create_user(
             email=request.email,
             password=request.password,
             display_name=request.display_name,
             preferred_language=request.preferred_language
         )
-        auth_data = authenticate_user(request.email, request.password)
+        auth_data = history_service.authenticate_user(request.email, request.password)
         if not auth_data:
             raise HTTPException(status_code=500, detail="Failed to initialize session after registration")
 
@@ -137,7 +110,7 @@ async def login(request: UserLoginRequest):
     """
     Authenticates email and password, returning user profile and session token.
     """
-    auth_data = authenticate_user(request.email, request.password)
+    auth_data = history_service.authenticate_user(request.email, request.password)
     if not auth_data:
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
@@ -164,7 +137,7 @@ async def update_profile(
     """
     Updates the authenticated user's profile display name or preferred language.
     """
-    updated = update_user_profile(
+    updated = history_service.update_user_profile(
         user_id=current_user["id"],
         display_name=request.display_name,
         preferred_language=request.preferred_language
@@ -182,7 +155,7 @@ async def logout(authorization: Optional[str] = Header(None)):
     """
     if authorization:
         token = authorization.replace("Bearer ", "").strip()
-        delete_session(token)
+        history_service.delete_session(token)
     return {"success": True, "message": "Logged out successfully"}
 
 
@@ -191,8 +164,22 @@ async def request_password_recovery(request: PasswordRecoveryRequest):
     """
     Processes a password recovery request for the provided email.
     """
-    # Honest handling: simulate confirmation instructions for development/demo
     return {
         "success": True,
         "message": f"If an account exists for {request.email}, password reset instructions have been generated."
     }
+
+
+# =========================================================================
+# MongoDB Data Migration Trigger
+# =========================================================================
+
+@router.post("/migrate-to-mongo")
+async def migrate_sqlite_data_to_mongo(current_user: dict = Depends(get_current_user_required)):
+    """
+    Administrative endpoint to copy all existing records from local SQLite into MongoDB Atlas.
+    """
+    result = history_service.migrate_all_to_mongodb()
+    if not result.get("success"):
+        raise HTTPException(status_code=500, detail=result.get("error", "Migration failed"))
+    return result

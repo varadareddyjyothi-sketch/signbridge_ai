@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Home, Camera, BookOpen, Database, Sparkles, LogIn, Menu, X } from 'lucide-react';
+import { Home, Camera, BookOpen, Database, LogIn, Menu, X, Lock } from 'lucide-react';
 import type { HealthStatus, ModelStatus, UserProfile } from '../types';
 
 export type AppNavTab = 'home' | 'recognition' | 'guide' | 'history';
@@ -33,6 +33,11 @@ export const Navbar: React.FC<NavbarProps> = ({
     activeTab as AppNavTab;
 
   const handleNavClick = (tab: AppNavTab) => {
+    if (tab !== 'home' && !currentUser) {
+      onOpenAuth();
+      setIsMobileMenuOpen(false);
+      return;
+    }
     setActiveTab(tab);
     setIsMobileMenuOpen(false);
   };
@@ -57,27 +62,26 @@ export const Navbar: React.FC<NavbarProps> = ({
           style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}
           title="SignBridge AI Home"
         >
-          <div style={{
-            width: '36px',
-            height: '36px',
-            borderRadius: '8px',
-            background: '#2563eb',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#ffffff',
-            boxShadow: '0 1px 2px rgba(37, 99, 235, 0.2)'
-          }}>
-            <Sparkles size={18} />
-          </div>
+          <img
+            src="/logo.png"
+            alt="SignBridge AI Logo"
+            style={{
+              width: '38px',
+              height: '38px',
+              borderRadius: '9px',
+              objectFit: 'contain',
+              boxShadow: '0 2px 4px rgba(37, 99, 235, 0.2)',
+              flexShrink: 0
+            }}
+          />
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em' }}>
+              <span className="navbar-brand-title" style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>
                 SignBridge AI
               </span>
               <span className="badge badge-primary" style={{ fontSize: '0.65rem', padding: '1px 6px' }}>ISL</span>
             </div>
-            <p style={{ fontSize: '0.72rem', color: '#64748b', margin: 0 }}>Indian Sign Language Assistant</p>
+            <p className="navbar-brand-subtitle" style={{ fontSize: '0.72rem', color: '#64748b', margin: 0, whiteSpace: 'nowrap' }}>Indian Sign Language Assistant</p>
           </div>
         </div>
 
@@ -125,6 +129,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <Camera size={15} />
             <span>Live Recognition</span>
+            {!currentUser && <span title="Login required" style={{ display: 'inline-flex' }}><Lock size={12} color="#94a3b8" /></span>}
           </button>
 
           <button
@@ -147,6 +152,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <BookOpen size={15} />
             <span>ISL Guide</span>
+            {!currentUser && <span title="Login required" style={{ display: 'inline-flex' }}><Lock size={12} color="#94a3b8" /></span>}
           </button>
 
           <button
@@ -169,6 +175,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <Database size={15} />
             <span>History</span>
+            {!currentUser && <span title="Login required" style={{ display: 'inline-flex' }}><Lock size={12} color="#94a3b8" /></span>}
           </button>
         </nav>
 
@@ -316,7 +323,8 @@ export const Navbar: React.FC<NavbarProps> = ({
             }}
           >
             <Camera size={16} />
-            <span>Live Recognition</span>
+            <span style={{ flex: 1 }}>Live Recognition</span>
+            {!currentUser && <Lock size={13} color="#94a3b8" />}
           </button>
 
           <button
@@ -337,7 +345,8 @@ export const Navbar: React.FC<NavbarProps> = ({
             }}
           >
             <BookOpen size={16} />
-            <span>ISL Guide</span>
+            <span style={{ flex: 1 }}>ISL Guide</span>
+            {!currentUser && <Lock size={13} color="#94a3b8" />}
           </button>
 
           <button
@@ -358,7 +367,8 @@ export const Navbar: React.FC<NavbarProps> = ({
             }}
           >
             <Database size={16} />
-            <span>History</span>
+            <span style={{ flex: 1 }}>History</span>
+            {!currentUser && <Lock size={13} color="#94a3b8" />}
           </button>
         </div>
       )}
@@ -371,6 +381,19 @@ export const Navbar: React.FC<NavbarProps> = ({
           }
           .mobile-menu-btn {
             display: inline-flex !important;
+          }
+        }
+        @media (max-width: 480px) {
+          .navbar-brand-subtitle {
+            display: none !important;
+          }
+          .navbar-brand-title {
+            font-size: 1.02rem !important;
+          }
+        }
+        @media (max-width: 360px) {
+          .navbar-brand-title {
+            font-size: 0.92rem !important;
           }
         }
       `}</style>

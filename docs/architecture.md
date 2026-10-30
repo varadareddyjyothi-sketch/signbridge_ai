@@ -36,7 +36,7 @@ SignBridge AI is designed with an edge-first computer vision philosophy. Rather 
 │                             ▼                          │
 │  ┌──────────────────────────────────────────────────┐  │
 │  │  Unified History & Storage Service               │  │
-│  │  - Primary: Supabase PostgreSQL (Auth + RLS)     │  │
+│  │  - Primary: MongoDB Atlas Cloud (Users, History) │  │
 │  │  - Local Fallback: Embedded SQLite               │  │
 │  └──────────────────────────────────────────────────┘  │
 └────────────────────────────────────────────────────────┘
@@ -88,10 +88,12 @@ Identical mathematical logic is implemented in both `ml/features.py` (Python) an
 
 ## 4. Database & Cloud Architecture
 
-- **Supabase Cloud**:
-  - Tables: `public.profiles`, `public.recognition_history`.
-  - Row Level Security: Policies enforce that users can only select and delete their own history.
-  - Anonymous Demo Mode: Demo records with `user_id = NULL` are permitted under anonymous session role.
+- **MongoDB Atlas Cloud**:
+  - Collections: `users`, `profiles`, `auth_sessions`, `recognition_history`, `sentence_history`.
+  - Indexes: Unique indexes on `users.email`, `users.id`, `auth_sessions.token`, and compound/timestamp sorting indexes on `recognition_history` and `sentence_history`.
+  - User Isolation: Queries filter strictly by authenticated `user_id`.
+  - Guest/Demo Mode: Unauthenticated records with `user_id = NULL` are permitted and isolated.
 - **Zero-Config Local Fallback**:
   - Embedded SQLite database `backend/app/database/signbridge_local.db`.
-  - Automatically activates when `SUPABASE_URL` is empty or connection fails.
+  - Automatically activates when `MONGODB_URI` is empty or connection fails.
+  - Seamless migration utility (`POST /auth/migrate-to-mongo`) to copy all records into MongoDB Atlas without duplicates.

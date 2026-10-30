@@ -554,7 +554,7 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
   }, [vocabularyList, vocabTypeFilter, vocabSearch]);
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 1.22fr) minmax(320px, 1fr)', gap: '24px', alignItems: 'start' }}>
+    <div className="camera-panel-grid">
       {/* =========================================================================
           LEFT PANEL: Live Webcam Preview & Controls
           ========================================================================= */}

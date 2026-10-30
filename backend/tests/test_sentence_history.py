@@ -72,3 +72,42 @@ async def test_sentence_history_and_isolation():
         # Verify User A now has 0 sentences
         res_after_a = await ac.get("/history/sentence", headers=headers_a)
         assert res_after_a.json()["total"] == 0
+
+
+@pytest.mark.anyio
+async def test_single_sentence_delete_and_security():
+    import uuid
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        email_1 = f"s1_{uuid.uuid4().hex[:8]}@example.com"
+        res_1 = await ac.post("/auth/register", json={
+            "email": email_1, "password": "Password123!", "display_name": "S1", "preferred_language": "en"
+        })
+        token_1 = res_1.json()["token"]
+        headers_1 = {"Authorization": f"Bearer {token_1}"}
+
+        email_2 = f"s2_{uuid.uuid4().hex[:8]}@example.com"
+        res_2 = await ac.post("/auth/register", json={
+            "email": email_2, "password": "Password123!", "display_name": "S2", "preferred_language": "en"
+        })
+        token_2 = res_2.json()["token"]
+        headers_2 = {"Authorization": f"Bearer {token_2}"}
+
+        # User 1 creates sentence
+        res_post = await ac.post("/history/sentence", json={
+            "original_signs": ["WATER"],
+            "confirmed_sentence": "I want water",
+            "english_output": "I want water",
+            "selected_language": "en"
+        }, headers=headers_1)
+        assert res_post.status_code == 200
+        sentence_id = res_post.json()["id"]
+
+        # User 2 tries to delete User 1's sentence -> 404 unauthorized
+        res_del_hack = await ac.delete(f"/history/sentence/{sentence_id}", headers=headers_2)
+        assert res_del_hack.status_code == 404
+
+        # User 1 deletes their sentence -> 200 OK
+        res_del_ok = await ac.delete(f"/history/sentence/{sentence_id}", headers=headers_1)
+        assert res_del_ok.status_code == 200
+        assert res_del_ok.json()["success"] is True

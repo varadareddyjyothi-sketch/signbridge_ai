@@ -327,13 +327,42 @@ def save_history_record(
     recognition_mode: str = "static_isl",
     user_id: Optional[str] = None
 ) -> Dict[str, Any]:
-    """Inserts a recognition record into the local SQLite table."""
+    """Inserts a recognition record into the local SQLite table with duplicate suppression."""
     init_local_db()
-    record_id = str(uuid.uuid4())
     now_iso = datetime.now(timezone.utc).isoformat()
 
     with get_db_connection() as conn:
         cursor = conn.cursor()
+
+        # Idempotency / duplicate protection: check if identical record was saved within the last 3.0 seconds
+        if user_id:
+            cursor.execute("""
+                SELECT id, user_id, predicted_label, english_meaning, confidence, recognition_mode, created_at
+                FROM recognition_history
+                WHERE user_id = ? AND predicted_label = ?
+                ORDER BY created_at DESC LIMIT 1
+            """, (user_id, predicted_label))
+        else:
+            cursor.execute("""
+                SELECT id, user_id, predicted_label, english_meaning, confidence, recognition_mode, created_at
+                FROM recognition_history
+                WHERE (user_id IS NULL OR user_id = '') AND predicted_label = ?
+                ORDER BY created_at DESC LIMIT 1
+            """, (predicted_label,))
+
+        recent = cursor.fetchone()
+        if recent:
+            recent_dict = dict(recent)
+            try:
+                recent_dt = datetime.fromisoformat(recent_dict["created_at"])
+                current_dt = datetime.fromisoformat(now_iso)
+                if abs((current_dt - recent_dt).total_seconds()) < 3.0:
+                    recent_dict["storage_source"] = "local_sqlite"
+                    return recent_dict
+            except Exception:
+                pass
+
+        record_id = str(uuid.uuid4())
         cursor.execute("""
             INSERT INTO recognition_history (
                 id, user_id, predicted_label, english_meaning, confidence, recognition_mode, created_at
@@ -354,7 +383,7 @@ def save_history_record(
 
 
 def fetch_history_records(user_id: Optional[str] = None, limit: int = 50) -> List[Dict[str, Any]]:
-    """Retrieves recognition records ordered by creation date descending."""
+    """Retrieves recognition records ordered by creation date descending with user/guest isolation."""
     init_local_db()
     with get_db_connection() as conn:
         cursor = conn.cursor()
@@ -370,6 +399,7 @@ def fetch_history_records(user_id: Optional[str] = None, limit: int = 50) -> Lis
             cursor.execute("""
                 SELECT id, user_id, predicted_label, english_meaning, confidence, recognition_mode, created_at
                 FROM recognition_history
+                WHERE user_id IS NULL OR user_id = ''
                 ORDER BY created_at DESC
                 LIMIT ?
             """, (limit,))
@@ -391,17 +421,31 @@ def fetch_history_records(user_id: Optional[str] = None, limit: int = 50) -> Lis
 
 
 def clear_history_records(user_id: Optional[str] = None) -> int:
-    """Clears history records, returning count of deleted records."""
+    """Clears history records for the current user or guest, never touching another user's records."""
     init_local_db()
     with get_db_connection() as conn:
         cursor = conn.cursor()
         if user_id:
             cursor.execute("DELETE FROM recognition_history WHERE user_id = ?", (user_id,))
         else:
-            cursor.execute("DELETE FROM recognition_history")
+            cursor.execute("DELETE FROM recognition_history WHERE user_id IS NULL OR user_id = ''")
         deleted_count = cursor.rowcount
         conn.commit()
     return deleted_count
+
+
+def delete_history_record_by_id(record_id: str, user_id: Optional[str] = None) -> bool:
+    """Deletes an individual recognition record if owned by the specific user or guest session."""
+    init_local_db()
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        if user_id:
+            cursor.execute("DELETE FROM recognition_history WHERE id = ? AND user_id = ?", (record_id, user_id))
+        else:
+            cursor.execute("DELETE FROM recognition_history WHERE id = ? AND (user_id IS NULL OR user_id = '')", (record_id,))
+        deleted = cursor.rowcount > 0
+        conn.commit()
+    return deleted
 
 
 # =========================================================================
@@ -487,7 +531,7 @@ def save_sentence_record(
 
 
 def fetch_sentence_records(user_id: Optional[str] = None, limit: int = 100) -> List[Dict[str, Any]]:
-    """Retrieves confirmed sentence records ordered by created_at DESC."""
+    """Retrieves confirmed sentence records ordered by created_at DESC with user/guest isolation."""
     init_local_db()
     with get_db_connection() as conn:
         cursor = conn.cursor()
@@ -507,6 +551,7 @@ def fetch_sentence_records(user_id: Optional[str] = None, limit: int = 100) -> L
                        telugu_output, romanized_output, selected_language, recognition_mode,
                        COALESCE(source_mode, 'camera_recognition') AS source_mode, created_at
                 FROM sentence_history
+                WHERE user_id IS NULL OR user_id = ''
                 ORDER BY created_at DESC
                 LIMIT ?
             """, (limit,))
@@ -516,28 +561,28 @@ def fetch_sentence_records(user_id: Optional[str] = None, limit: int = 100) -> L
 
 
 def clear_sentence_records(user_id: Optional[str] = None) -> int:
-    """Clears confirmed sentence records."""
+    """Clears confirmed sentence records for the current user or guest, never touching another user's records."""
     init_local_db()
     with get_db_connection() as conn:
         cursor = conn.cursor()
         if user_id:
             cursor.execute("DELETE FROM sentence_history WHERE user_id = ?", (user_id,))
         else:
-            cursor.execute("DELETE FROM sentence_history")
+            cursor.execute("DELETE FROM sentence_history WHERE user_id IS NULL OR user_id = ''")
         deleted_count = cursor.rowcount
         conn.commit()
     return deleted_count
 
 
 def delete_sentence_record_by_id(record_id: str, user_id: Optional[str] = None) -> bool:
-    """Deletes a specific confirmed sentence record if owned by user or anonymous."""
+    """Deletes a specific confirmed sentence record if owned by the specific user or guest session."""
     init_local_db()
     with get_db_connection() as conn:
         cursor = conn.cursor()
         if user_id:
             cursor.execute("DELETE FROM sentence_history WHERE id = ? AND user_id = ?", (record_id, user_id))
         else:
-            cursor.execute("DELETE FROM sentence_history WHERE id = ?", (record_id,))
+            cursor.execute("DELETE FROM sentence_history WHERE id = ? AND (user_id IS NULL OR user_id = '')", (record_id,))
         deleted = cursor.rowcount > 0
         conn.commit()
     return deleted

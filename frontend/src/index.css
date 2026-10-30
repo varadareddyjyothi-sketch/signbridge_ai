@@ -60,6 +60,20 @@
   padding: 0;
 }
 
+html, body {
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100vw;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  width: 100%;
+}
+
 body {
   background-color: var(--bg-main);
   background-image: 
@@ -315,8 +329,15 @@ tr:hover td {
 /* Layout Utilities */
 .container {
   max-width: 1280px;
+  width: 100%;
   margin: 0 auto;
   padding: 0 20px;
+}
+
+@media (max-width: 640px) {
+  .container {
+    padding: 0 12px;
+  }
 }
 
 .grid-cols-2 {
@@ -328,5 +349,43 @@ tr:hover td {
 @media (max-width: 900px) {
   .grid-cols-2 {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Responsive Camera & Recognition Grid */
+.camera-panel-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 1024px) {
+  .camera-panel-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+}
+
+/* Responsive Table Wrapper */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Mobile Touch Target and Form Optimizations */
+@media (max-width: 640px) {
+  .btn {
+    min-height: 40px;
+  }
+  
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="search"],
+  select {
+    font-size: 16px; /* Prevents auto-zoom on mobile safari/chrome */
+    min-height: 40px;
   }
 }

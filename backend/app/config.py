@@ -38,10 +38,11 @@ class Settings(BaseSettings):
 
     DATASET_PATH: str = str(BASE_DIR / "ml" / "dataset" / "isl_landmarks_dataset.csv")
 
-    # Supabase (Optional - SQLite local fallback used when absent)
-    SUPABASE_URL: str = ""
-    SUPABASE_PUBLISHABLE_KEY: str = ""
-    SUPABASE_SECRET_KEY: str = ""
+    # MongoDB Configuration (Atlas or local connection string)
+    MONGODB_URI: str = os.getenv("MONGODB_URI", "")
+    MONGODB_DB_NAME: str = os.getenv("MONGODB_DB_NAME", "signbridge_ai")
+    JWT_SECRET: str = os.getenv("JWT_SECRET", "signbridge_ai_super_secret_jwt_key_2026_secured")
+    JWT_ALGORITHM: str = "HS256"
 
     # Local SQLite Fallback DB Path
     SQLITE_DB_PATH: str = str(BASE_DIR / "backend" / "app" / "database" / "signbridge_local.db")
@@ -53,7 +54,18 @@ class Settings(BaseSettings):
     def cors_origins(self) -> List[str]:
         if not self.ALLOWED_ORIGINS or self.ALLOWED_ORIGINS.strip() == "*":
             return ["*"]
-        return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",") if origin.strip()]
+        origins = [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",") if origin.strip()]
+        dev_ports = [
+            "http://localhost:5173", "http://127.0.0.1:5173",
+            "http://localhost:5174", "http://127.0.0.1:5174",
+            "http://localhost:5175", "http://127.0.0.1:5175",
+            "http://localhost:3000", "http://127.0.0.1:3000",
+            "http://localhost:8000", "http://127.0.0.1:8000"
+        ]
+        for dp in dev_ports:
+            if dp not in origins:
+                origins.append(dp)
+        return origins
 
     @property
     def allow_credentials(self) -> bool:

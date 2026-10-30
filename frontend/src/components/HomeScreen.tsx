@@ -1,6 +1,6 @@
 import React from 'react';
-import { Camera, BookOpen, MessageSquare, CheckCircle2, ArrowRight, Sparkles, Globe } from 'lucide-react';
-import type { ModelStatus, HealthStatus } from '../types';
+import { Camera, BookOpen, MessageSquare, CheckCircle2, ArrowRight, Sparkles, Globe, Lock } from 'lucide-react';
+import type { ModelStatus, HealthStatus, UserProfile } from '../types';
 
 interface HomeScreenProps {
   onStartCommunicating: () => void;
@@ -8,6 +8,8 @@ interface HomeScreenProps {
   onExploreGuide: () => void;
   modelStatus: ModelStatus | null;
   health: HealthStatus | null;
+  currentUser?: UserProfile | null;
+  onOpenAuth?: () => void;
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
@@ -15,7 +17,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onOpenQuickPhrases,
   onExploreGuide,
   modelStatus,
-  health
+  health,
+  currentUser
 }) => {
   const isOnline = health?.status === 'healthy';
   const isModelReady = modelStatus && modelStatus.status !== 'unavailable';
@@ -27,7 +30,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       <div
         className="glass-panel"
         style={{
-          padding: '40px 32px',
+          padding: 'clamp(20px, 4vw, 40px) clamp(16px, 4vw, 32px)',
           textAlign: 'center',
           borderRadius: '12px',
           background: '#ffffff',
@@ -47,14 +50,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           color: '#1d4ed8',
           fontSize: '0.8rem',
           fontWeight: 600,
-          marginBottom: '16px'
+          marginBottom: '16px',
+          maxWidth: '100%',
+          boxSizing: 'border-box'
         }}>
-          <Sparkles size={14} />
-          <span>Indian Sign Language (ISL) Assistance Platform</span>
+          <Sparkles size={14} style={{ flexShrink: 0 }} />
+          <span>Indian Sign Language (ISL) Platform</span>
         </div>
 
         <h1 style={{
-          fontSize: '2.4rem',
+          fontSize: 'clamp(1.5rem, 4vw, 2.3rem)',
           fontWeight: 800,
           letterSpacing: '-0.025em',
           lineHeight: 1.25,
@@ -89,8 +94,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               gap: '8px'
             }}
           >
-            <Camera size={18} />
-            <span>Start Communicating</span>
+            {currentUser ? <Camera size={18} /> : <Lock size={17} />}
+            <span>{currentUser ? 'Start Communicating' : 'Sign In to Start Communicating'}</span>
             <ArrowRight size={16} />
           </button>
 
@@ -101,6 +106,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           >
             <MessageSquare size={17} color="#d97706" />
             <span>Quick Phrase Library (A-H)</span>
+            {!currentUser && <Lock size={13} color="#94a3b8" />}
           </button>
 
           <button
@@ -110,8 +116,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           >
             <BookOpen size={17} color="#2563eb" />
             <span>Learn Supported Signs</span>
+            {!currentUser && <Lock size={13} color="#94a3b8" />}
           </button>
         </div>
+
+        {!currentUser && (
+          <div style={{ marginBottom: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '0.82rem', color: '#64748b' }}>
+            <Lock size={13} color="#2563eb" />
+            <span>Account authentication required to access the AI recognition workspace and sentence logs.</span>
+          </div>
+        )}
 
         {/* System & Model Live Status Pill */}
         <div style={{
@@ -158,7 +172,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           How to Use SignBridge AI in 3 Simple Steps
         </h2>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
           {/* Step 1 */}
           <div className="glass-panel" style={{ padding: '20px', borderRadius: '10px' }}>
             <div style={{

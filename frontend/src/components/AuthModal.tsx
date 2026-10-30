@@ -31,31 +31,46 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     e.preventDefault();
     setErrorMsg(null);
     setSuccessMsg(null);
+
+    const cleanEmail = email.trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(cleanEmail)) {
+      setErrorMsg('Please enter a valid email address (e.g. user@example.com)');
+      return;
+    }
+
+    if (mode === 'register' && password.length < 6) {
+      setErrorMsg('Password must be at least 6 characters long.');
+      return;
+    }
+
+    if (mode === 'register' && !displayName.trim()) {
+      setErrorMsg('Please enter your full name or display name.');
+      return;
+    }
+
     setLoading(true);
 
     try {
       if (mode === 'login') {
-        const res = await api.login(email.trim(), password);
+        const res = await api.login(cleanEmail, password);
         onAuthSuccess(res.user);
         onClose();
       } else if (mode === 'register') {
-        if (password.length < 6) {
-          throw new Error('Password must be at least 6 characters');
-        }
         const res = await api.register(
-          email.trim(),
+          cleanEmail,
           password,
-          displayName.trim() || email.split('@')[0],
+          displayName.trim(),
           preferredLanguage
         );
         onAuthSuccess(res.user);
         onClose();
       } else if (mode === 'recovery') {
-        const res = await api.requestPasswordRecovery(email.trim());
+        const res = await api.requestPasswordRecovery(cleanEmail);
         setSuccessMsg(res.message);
       }
     } catch (err: any) {
-      setErrorMsg(err.message || 'Authentication error');
+      setErrorMsg(err.message || 'Authentication error. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -82,12 +97,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       <div
         style={{
           width: '100%',
-          maxWidth: '440px',
+          maxWidth: 'min(440px, calc(100vw - 32px))',
+          maxHeight: 'calc(100vh - 32px)',
+          overflowY: 'auto',
           backgroundColor: '#ffffff',
           border: '1px solid #e2e8f0',
           borderRadius: '12px',
           boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.08)',
-          overflow: 'hidden',
           padding: '24px',
           position: 'relative'
         }}
@@ -114,19 +130,27 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
         {/* Modal Header */}
         <div style={{ marginBottom: '20px' }}>
-          <div style={{
-            width: '42px',
-            height: '42px',
-            borderRadius: '8px',
-            backgroundColor: '#eff6ff',
-            border: '1px solid #bfdbfe',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#2563eb',
-            marginBottom: '12px'
-          }}>
-            <Lock size={20} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
+            <img
+              src="/logo.png"
+              alt="SignBridge AI Logo"
+              style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '10px',
+                objectFit: 'contain',
+                boxShadow: '0 2px 6px rgba(37, 99, 235, 0.18)',
+                background: '#ffffff'
+              }}
+            />
+            <div>
+              <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block' }}>
+                SignBridge AI
+              </span>
+              <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                Secure Account Portal
+              </span>
+            </div>
           </div>
           <h2 id="auth-modal-title" style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
             {mode === 'login' && 'Sign in to SignBridge'}

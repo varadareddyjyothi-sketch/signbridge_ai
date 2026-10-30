@@ -28,4 +28,6 @@ async def test_health_endpoint():
     assert data["status"] == "healthy"
     assert data["model_status"] in ["trained", "evaluated", "experimental", "unavailable"]
     assert "storage_mode" in data
+    assert "mongodb_configured" in data
+    assert "mongodb_connected" in data
     assert "timestamp" in data

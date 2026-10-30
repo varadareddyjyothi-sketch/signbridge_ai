@@ -56,7 +56,7 @@ The application combines **in-browser edge hand tracking (MediaPipe)** with a cu
    - **Hearing Person ➔ Signer**: Speech-to-Text (STT) transcribes spoken words into large, high-contrast readable text for the ISL user.
 
 7. **Dual-Mode Cloud & Local Persistence**:
-   - **Supabase Cloud**: PostgreSQL with user-scoped Row Level Security (RLS) policies.
+   - **MongoDB Atlas Cloud**: Document database with indexed collections (`users`, `profiles`, `auth_sessions`, `recognition_history`, `sentence_history`).
    - **Local SQLite Fallback**: Automatic embedded SQLite database (`signbridge_local.db`) when cloud credentials are not supplied.
 
 ---
@@ -70,7 +70,7 @@ The application combines **in-browser edge hand tracking (MediaPipe)** with a cu
 | **Speech APIs** | Web SpeechSynthesis API (TTS), Web SpeechRecognition API (STT) |
 | **Backend** | Python 3.13+, FastAPI, Pydantic v2, Uvicorn |
 | **Machine Learning** | Scikit-learn (RandomForestClassifier), NumPy, Pandas, Joblib |
-| **Database** | Supabase (PostgreSQL with RLS) + Embedded SQLite fallback |
+| **Database** | MongoDB Atlas (Cloud) + Embedded SQLite fallback |
 
 ---
 
@@ -80,8 +80,8 @@ The application combines **in-browser edge hand tracking (MediaPipe)** with a cu
 signbridge-ai/
 ├── backend/
 │   ├── app/
-│   │   ├── api/             # API route handlers (health, predict, history, dataset)
-│   │   ├── database/        # Supabase client, SQLite fallback, history service
+│   │   ├── api/             # API route handlers (health, predict, history, dataset, auth)
+│   │   ├── database/        # MongoDB client, SQLite fallback, history service
 │   │   ├── schemas/         # Pydantic v2 validation models
 │   │   ├── services/        # Inference service & model management
 │   │   ├── config.py        # Settings & environment configuration
@@ -92,7 +92,7 @@ signbridge-ai/
 │   │   ├── components/      # Navbar, LandingHero, CameraPanel, TwoWaySpeech, DatasetStudio, HistoryLog, ISLGuide
 │   │   ├── hooks/           # useWebcamHands (MediaPipe + skeleton canvas)
 │   │   ├── lib/             # TypeScript landmark normalization (matches Python)
-│   │   ├── services/        # API client, Supabase client, Speech services
+│   │   ├── services/        # API client, Speech services
 │   │   ├── types/           # TypeScript data interfaces
 │   │   ├── App.tsx          # Main React layout & tab router
 │   │   └── index.css        # Glassmorphic dark design system
@@ -104,8 +104,6 @@ signbridge-ai/
 │   ├── scripts/             # collect_data.py, train_model.py, evaluate_model.py, generate_initial_dataset.py
 │   ├── features.py          # 63-d landmark normalization module
 │   └── tests/               # Unit tests for translation/scale invariance
-├── supabase/
-│   └── migrations/          # 20261026_init_signbridge_schema.sql (Tables, RLS, Indexes)
 ├── docs/                    # System architecture & database setup guides
 ├── .env.example             # Template for configuration
 ├── pytest.ini               # Pytest configuration
@@ -222,19 +220,20 @@ Accepted Predictions Accuracy: 99.27%
 
 ---
 
-## ☁️ Supabase Cloud Database Configuration
+## ☁️ MongoDB Atlas Cloud Database Configuration
 
-SignBridge AI works out of the box with embedded SQLite. To connect Supabase:
+SignBridge AI works out of the box with embedded SQLite. To connect MongoDB Atlas:
 
-1. Create a project on [Supabase](https://supabase.com).
-2. Go to the SQL Editor and execute the migration script:
-   [`supabase/migrations/20261026_init_signbridge_schema.sql`](file:///c:/Users/varad/OneDrive/Pictures/Screenshots/last%20project/supabase/migrations/20261026_init_signbridge_schema.sql)
-3. Fill in your credentials in `.env` and `frontend/.env`:
+1. Create a cluster on [MongoDB Atlas](https://www.mongodb.com/cloud/atlas).
+2. Obtain your MongoDB connection string (Project: `69ba6bd5b08f2ff79b9aa170`).
+3. Set your credentials in `.env`:
    ```env
-   SUPABASE_URL=https://your-project.supabase.co
-   SUPABASE_PUBLISHABLE_KEY=your-publishable-key
+   MONGODB_URI=mongodb+srv://<username>:<password>@cluster0.mongodb.net/signbridge_ai?retryWrites=true&w=majority
+   MONGODB_DB_NAME=signbridge_ai
+   JWT_SECRET=your-secret-key-here
    ```
-4. Restart the backend and frontend. The navbar will reflect `Storage: Supabase`.
+4. Restart the backend. The navbar and `/health` will reflect `Storage: MongoDB Atlas`.
+5. Run `POST /auth/migrate-to-mongo` to copy any existing local SQLite records into MongoDB Atlas without duplicates.
 
 ---
 
@@ -269,8 +268,9 @@ DeployXa automatically detects the root `Dockerfile` and builds a secure multi-s
    | `ENVIRONMENT` | `production` | Enables production security & logging |
    | `ALLOWED_ORIGINS` | `*` (or your DeployXa domain) | Configures CORS for browser clients |
    | `CONFIDENCE_THRESHOLD` | `0.65` | Anti-hallucination rejection threshold |
-   | `SUPABASE_URL` | *(optional)* | Supabase project URL (falls back to SQLite) |
-   | `SUPABASE_PUBLISHABLE_KEY` | *(optional)* | Supabase anon publishable key |
+   | `MONGODB_URI` | *(optional)* | MongoDB Atlas connection string (falls back to SQLite) |
+   | `MONGODB_DB_NAME` | `signbridge_ai` | MongoDB database name |
+   | `JWT_SECRET` | `your-secret-key` | Secret key for JWT session hashing |
 3. **Deploy**:
    - Click **Deploy**. DeployXa will automatically run the multi-stage Docker build, execute health checks on `/health`, and assign a secure HTTPS URL.
 
@@ -314,8 +314,9 @@ After deploying on DeployXa, verify the live deployment:
      "environment": "production",
      "model_status": "evaluated",
      "model_classes_count": 15,
-     "storage_mode": "sqlite_local",
-     "supabase_configured": false,
+     "storage_mode": "local_sqlite",
+     "mongodb_configured": false,
+     "mongodb_connected": false,
      "timestamp": "..."
    }
    ```

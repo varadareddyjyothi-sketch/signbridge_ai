@@ -77,9 +77,9 @@ export const LandingHero: React.FC<LandingHeroProps> = ({ onStartClick, classesC
           <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: 'rgba(245, 158, 11, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '14px' }}>
             <ShieldCheck size={22} color="#fbbf24" />
           </div>
-          <h3 style={{ fontSize: '1.1rem', marginBottom: '8px' }}>Supabase Cloud + Local SQLite</h3>
+          <h3 style={{ fontSize: '1.1rem', marginBottom: '8px' }}>MongoDB Atlas Cloud + Local SQLite</h3>
           <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
-            Dual-mode persistence: secure Row Level Security (RLS) PostgreSQL database with automatic zero-configuration local SQLite fallback.
+            Dual-mode persistence: resilient MongoDB Atlas cloud document database with indexed collections and zero-configuration local SQLite fallback.
           </p>
         </div>
       </div>
