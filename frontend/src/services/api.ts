@@ -560,6 +560,55 @@ export const api = {
   },
 
   // =========================================================================
+  // Multilingual Speech & Text Translation
+  // =========================================================================
+
+  async translateText(payload: {
+    text: string;
+    source_lang?: string;
+    target_lang?: string;
+  }): Promise<{
+    original_text: string;
+    source_lang: string;
+    target_lang: string;
+    translated_text: string;
+    romanized_text?: string;
+    english_text?: string;
+    telugu_text?: string;
+    hindi_text?: string;
+    confidence: number;
+    method: string;
+  }> {
+    const res = await fetchWithTimeout(`${API_BASE}/translate/text`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text: payload.text,
+        source_lang: payload.source_lang || 'en',
+        target_lang: payload.target_lang || 'te'
+      })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: `Translation request failed (HTTP ${res.status})` }));
+      throw new Error(err.detail || 'Translation request failed');
+    }
+    return res.json();
+  },
+
+  async transliterate(text: string, script = 'telugu'): Promise<{ original_text: string; script: string; romanized_text: string }> {
+    const res = await fetchWithTimeout(`${API_BASE}/translate/transliterate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, script })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: `Transliteration request failed (HTTP ${res.status})` }));
+      throw new Error(err.detail || 'Transliteration request failed');
+    }
+    return res.json();
+  },
+
+  // =========================================================================
   // Excel (.xlsx) Export Services
   // =========================================================================
 

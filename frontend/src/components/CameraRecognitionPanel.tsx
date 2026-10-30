@@ -32,6 +32,7 @@ import type {
 } from '../types';
 
 export type RecognitionMode = 'pretrained' | 'custom_isl';
+export type DisplayLanguageMode = 'all' | 'en' | 'te' | 'ro' | 'hi';
 
 export type RecognitionState =
   | 'waiting_hand'
@@ -39,8 +40,6 @@ export type RecognitionState =
   | 'gesture_detected'
   | 'unknown_gesture'
   | 'model_unavailable';
-
-export type DisplayLanguageMode = 'all' | 'en' | 'te' | 'ro';
 
 interface CameraRecognitionPanelProps {
   modelStatus: ModelStatus | null;
@@ -88,7 +87,7 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
   const [autoSpeak, setAutoSpeak] = useState<boolean>(true);
   const [autoSpeakLang, setAutoSpeakLang] = useState<'en' | 'te'>('en');
 
-  // Display Language Preference ('all', 'en', 'te', 'ro')
+  // Display Language for recognized gestures
   const [displayLanguage, setDisplayLanguage] = useState<DisplayLanguageMode>('all');
 
   // TTS notice (e.g. fallback notice when Telugu voice is missing)
@@ -559,9 +558,9 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
 
   return (
     <div className="camera-panel-grid">
-      {/* =========================================================================
-          LEFT PANEL: Live Webcam Preview & Controls
-          ========================================================================= */}
+          {/* =========================================================================
+              LEFT PANEL: Live Webcam Preview & Controls
+              ========================================================================= */}
       <div className="glass-panel" style={{ padding: '20px', overflow: 'hidden' }}>
         {/* Panel Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
@@ -1041,13 +1040,14 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
             </div>
           </div>
 
-          {/* Language Selector in Results Panel */}
+          {/* Synchronized Output Language Selector in Results Panel */}
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '6px',
-              padding: '6px 10px',
+              justifyContent: 'space-between',
+              gap: '10px',
+              padding: '8px 14px',
               background: '#f8fafc',
               borderRadius: '8px',
               border: '1px solid var(--border-subtle)',
@@ -1055,34 +1055,32 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
               flexWrap: 'wrap'
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--text-secondary)', fontSize: '0.74rem', marginRight: '4px' }}>
-              <Languages size={14} color="#2563eb" />
-              <span>Language View:</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-secondary)', fontSize: '0.78rem' }}>
+              <Languages size={15} color="#2563eb" />
+              <span style={{ fontWeight: 600 }}>Output Language:</span>
             </div>
 
-            {(['all', 'en', 'te', 'ro'] as DisplayLanguageMode[]).map((mode) => (
-              <button
-                key={mode}
-                onClick={() => setDisplayLanguage(mode)}
-                style={{
-                  padding: '4px 10px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  fontSize: '0.74rem',
-                  fontWeight: displayLanguage === mode ? 700 : 500,
-                  background: displayLanguage === mode ? '#eff6ff' : 'transparent',
-                  color: displayLanguage === mode ? '#1d4ed8' : 'var(--text-secondary)',
-                  borderBottom: displayLanguage === mode ? '2px solid #2563eb' : '2px solid transparent',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                {mode === 'all' && 'All Modes'}
-                {mode === 'en' && 'English'}
-                {mode === 'te' && 'తెలుగు (Telugu)'}
-                {mode === 'ro' && 'Romanized'}
-              </button>
-            ))}
+            <select
+              value={displayLanguage}
+              onChange={(e) => setDisplayLanguage(e.target.value as DisplayLanguageMode)}
+              style={{
+                padding: '5px 10px',
+                borderRadius: '6px',
+                border: '1px solid #cbd5e1',
+                background: '#ffffff',
+                fontSize: '0.78rem',
+                fontWeight: 600,
+                color: '#1d4ed8',
+                cursor: 'pointer',
+                outline: 'none'
+              }}
+            >
+              <option value="all">All Languages (Side-by-Side)</option>
+              <option value="en">English (English)</option>
+              <option value="te">తెలుగు (Telugu Script)</option>
+              <option value="ro">Romanized Telugu (Phonetic)</option>
+              <option value="hi">हिंदी (Hindi Script)</option>
+            </select>
           </div>
 
           {/* TTS Notice Alert */}
@@ -1611,3 +1609,4 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
     </div>
   );
 };
+

@@ -117,3 +117,67 @@ async def get_quick_phrases(
         phrases=[QuickPhraseItem(**p) for p in phrases],
         total=len(phrases)
     )
+
+
+# =========================================================================
+# Mode 3: Multilingual Speech & Text Translation / Transliteration
+# =========================================================================
+
+class TextTranslationRequest(BaseModel):
+    text: str = Field(..., description="Input spoken or typed text")
+    source_lang: str = Field("en", description="Source language code ('en', 'te', 'hi')")
+    target_lang: str = Field("te", description="Target language code ('en', 'te', 'te-ro', 'hi')")
+
+
+class TextTranslationResponse(BaseModel):
+    original_text: str
+    source_lang: str
+    target_lang: str
+    translated_text: str
+    romanized_text: Optional[str] = ""
+    english_text: Optional[str] = ""
+    telugu_text: Optional[str] = ""
+    hindi_text: Optional[str] = ""
+    confidence: float
+    method: str
+
+
+class TransliterationRequest(BaseModel):
+    text: str = Field(..., description="Native script text")
+    script: str = Field("telugu", description="Source script name ('telugu')")
+
+
+class TransliterationResponse(BaseModel):
+    original_text: str
+    script: str
+    romanized_text: str
+
+
+@router.post("/text", response_model=TextTranslationResponse)
+async def translate_text_endpoint(request: TextTranslationRequest):
+    """
+    Translates recognized speech or typed text between English, Telugu, and Hindi,
+    providing Romanized Telugu transliteration and preserving the original sentence.
+    """
+    from backend.app.services.multilingual_nlp_service import multilingual_nlp_service
+    res = multilingual_nlp_service.translate(
+        text=request.text,
+        source_lang=request.source_lang,
+        target_lang=request.target_lang
+    )
+    return TextTranslationResponse(**res)
+
+
+@router.post("/transliterate", response_model=TransliterationResponse)
+async def transliterate_endpoint(request: TransliterationRequest):
+    """
+    Deterministically transliterates Telugu script Unicode into natural phonetic Romanized Telugu.
+    """
+    from backend.app.services.multilingual_nlp_service import multilingual_nlp_service
+    res = multilingual_nlp_service.transliterate_text(text=request.text, script=request.script)
+    return TransliterationResponse(
+        original_text=request.text,
+        script=request.script,
+        romanized_text=res
+    )
+
