@@ -11,6 +11,7 @@ export interface SmoothedPrediction {
   stableMeaning: string | null;
   stableTelugu?: string | null;
   stableTeluguRomanized?: string | null;
+  stableHindi?: string | null;
   smoothedConfidence: number | null;
   status: 'accepted' | 'uncertain_rejected' | 'no_hand' | 'model_unavailable' | 'waiting';
   is_verified_isl: boolean;
@@ -30,6 +31,7 @@ export class TemporalPredictionSmoother {
   private lastStableMeaning: string | null = null;
   private lastStableTelugu: string | null = null;
   private lastStableTeluguRomanized: string | null = null;
+  private lastStableHindi: string | null = null;
   private lastStableConfidence: number | null = null;
   private lastStableVerified: boolean = false;
   private lastStableGestureType: 'static' | 'dynamic' | 'verified_isl' | 'two_hand_isl' | 'general_gesture' = 'static';
@@ -49,6 +51,7 @@ export class TemporalPredictionSmoother {
     this.lastStableMeaning = null;
     this.lastStableTelugu = null;
     this.lastStableTeluguRomanized = null;
+    this.lastStableHindi = null;
     this.lastStableConfidence = null;
     this.lastStableVerified = false;
     this.lastStableGestureType = 'static';
@@ -100,6 +103,7 @@ export class TemporalPredictionSmoother {
       meaning: string;
       telugu?: string | null;
       telugu_romanized?: string | null;
+      hindi?: string | null;
       gesture_type?: 'static' | 'dynamic' | 'verified_isl' | 'two_hand_isl' | 'general_gesture';
       model_version?: string;
       totalConf: number;
@@ -118,6 +122,7 @@ export class TemporalPredictionSmoother {
             meaning: sample.english_meaning,
             telugu: sample.telugu,
             telugu_romanized: sample.telugu_romanized,
+            hindi: sample.hindi,
             gesture_type: sample.gesture_type || 'static',
             model_version: sample.model_version || 'v1.0.0',
             totalConf: 0,
@@ -137,6 +142,7 @@ export class TemporalPredictionSmoother {
     let bestMeaning: string | null = null;
     let bestTelugu: string | null = null;
     let bestTeluguRomanized: string | null = null;
+    let bestHindi: string | null = null;
     let bestGestureType: 'static' | 'dynamic' | 'verified_isl' | 'two_hand_isl' | 'general_gesture' = 'static';
     let bestVersion: string = 'v1.0.0';
     let bestAvgConf = 0;
@@ -149,6 +155,7 @@ export class TemporalPredictionSmoother {
         bestMeaning = info.meaning;
         bestTelugu = info.telugu ?? null;
         bestTeluguRomanized = info.telugu_romanized ?? null;
+        bestHindi = info.hindi ?? null;
         bestGestureType = info.gesture_type || 'static';
         bestVersion = info.model_version || 'v1.0.0';
         bestAvgConf = info.totalConf / info.count;
@@ -164,6 +171,7 @@ export class TemporalPredictionSmoother {
       this.lastStableMeaning = bestMeaning;
       this.lastStableTelugu = bestTelugu;
       this.lastStableTeluguRomanized = bestTeluguRomanized;
+      this.lastStableHindi = bestHindi;
       this.lastStableGestureType = bestGestureType;
       this.lastStableVersion = bestVersion;
       this.lastStableConfidence = Number(bestAvgConf.toFixed(3));
@@ -174,6 +182,7 @@ export class TemporalPredictionSmoother {
         stableMeaning: this.lastStableMeaning,
         stableTelugu: this.lastStableTelugu,
         stableTeluguRomanized: this.lastStableTeluguRomanized,
+        stableHindi: this.lastStableHindi,
         smoothedConfidence: this.lastStableConfidence,
         status: 'accepted',
         is_verified_isl: this.lastStableVerified,

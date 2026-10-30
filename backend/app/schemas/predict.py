@@ -62,6 +62,7 @@ class PredictionResponse(BaseModel):
     english_meaning: Optional[str] = Field(None, description="Human-readable translation or description")
     telugu: Optional[str] = Field(None, description="Telugu script translation")
     telugu_romanized: Optional[str] = Field(None, description="Romanized Telugu translation")
+    hindi: Optional[str] = Field(None, description="Hindi script translation")
     confidence: Optional[float] = Field(None, description="Predicted probability/confidence score (0.0 - 1.0)")
     status: str = Field(
         ...,

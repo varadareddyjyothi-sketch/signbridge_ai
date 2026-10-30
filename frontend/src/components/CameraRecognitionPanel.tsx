@@ -17,22 +17,28 @@ import {
   Clock,
   Globe,
   Languages,
-  Search,
-  RefreshCw
+  RefreshCw,
+  Hash
 } from 'lucide-react';
 import { useWebcamHands } from '../hooks/useWebcamHands';
 import { api } from '../services/api';
 import { ttsService } from '../services/speech';
 import { mediapipeGestureService } from '../services/mediapipeGestureService';
 import { TemporalPredictionSmoother, type SmoothedPrediction } from '../lib/smoothing';
+import {
+  type NumberToken,
+  evaluateTokenSequence,
+  NumericalDebounceController,
+  isNumericalGesture,
+  GESTURE_TO_NUMBER_TOKEN
+} from '../lib/numberComposition';
 import type {
   ModelStatus,
-  PredictionResult,
-  GestureVocabularyEntry
+  PredictionResult
 } from '../types';
 
 export type RecognitionMode = 'pretrained' | 'custom_isl';
-export type DisplayLanguageMode = 'all' | 'en' | 'te' | 'ro' | 'hi';
+export type DisplayLanguageMode = 'en' | 'te' | 'ro' | 'hi';
 
 export type RecognitionState =
   | 'waiting_hand'
@@ -73,8 +79,8 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
     hasMultipleCameras
   } = useWebcamHands();
 
-  // Mode Selection: Pretrained General Gestures vs Custom ISL Classifier
-  const [recognitionMode, setRecognitionMode] = useState<RecognitionMode>('pretrained');
+  // Mode Selection: Pretrained General Gestures vs Custom ISL Classifier (default to Custom ISL Classifier)
+  const [recognitionMode, setRecognitionMode] = useState<RecognitionMode>('custom_isl');
   const [showTwoHandHelp, setShowTwoHandHelp] = useState<boolean>(false);
 
   // Recognition Active Flag (user can start/stop recognition independently while camera is on)
@@ -83,12 +89,16 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
   // Confidence rejection threshold (0.50 to 0.90)
   const [threshold, setThreshold] = useState<number>(0.65);
 
-  // Auto-TTS Speech & preferred auto-speak language
+  // Auto-TTS Speech enabled
   const [autoSpeak, setAutoSpeak] = useState<boolean>(true);
-  const [autoSpeakLang, setAutoSpeakLang] = useState<'en' | 'te'>('en');
 
-  // Display Language for recognized gestures
-  const [displayLanguage, setDisplayLanguage] = useState<DisplayLanguageMode>('all');
+  // Single Active Output Language for recognized gestures (One Gesture = One Name)
+  const [displayLanguage, setDisplayLanguage] = useState<DisplayLanguageMode>('en');
+
+  // Numerical Gesture Composition (1 to 1,000,000,000 and beyond)
+  const [numberSequence, setNumberSequence] = useState<NumberToken[]>([]);
+  const numberDebouncer = useMemo(() => new NumericalDebounceController(1100), []);
+  const numericalEval = useMemo(() => evaluateTokenSequence(numberSequence), [numberSequence]);
 
   // TTS notice (e.g. fallback notice when Telugu voice is missing)
   const [ttsNotice, setTtsNotice] = useState<string | null>(null);
@@ -100,11 +110,6 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
   // Probability breakdown accordion
   const [showProbabilities, setShowProbabilities] = useState<boolean>(false);
 
-  // Dynamic Vocabulary from backend
-  const [vocabularyList, setVocabularyList] = useState<GestureVocabularyEntry[]>([]);
-  const [vocabSearch, setVocabSearch] = useState<string>('');
-  const [vocabTypeFilter, setVocabTypeFilter] = useState<string>('all');
-
   // Raw and Smoothed Predictions
   const smoother = useMemo(() => new TemporalPredictionSmoother(5, 0.6), []);
   const [rawPrediction, setRawPrediction] = useState<PredictionResult | null>(null);
@@ -113,6 +118,7 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
     stableMeaning: 'Start camera and recognition to analyze hand gestures live',
     stableTelugu: null,
     stableTeluguRomanized: null,
+    stableHindi: null,
     smoothedConfidence: null,
     status: 'waiting',
     is_verified_isl: false,
@@ -129,6 +135,7 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
     meaning: string;
     telugu?: string | null;
     telugu_romanized?: string | null;
+    hindi?: string | null;
     timestamp: string;
     confidence: number | null;
     model_version?: string;
@@ -142,6 +149,7 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
       meaning: string;
       telugu?: string | null;
       telugu_romanized?: string | null;
+      hindi?: string | null;
       time: string;
       confidence: number | null;
     }[]
@@ -155,22 +163,6 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
 
   // Model availability flags
   const isCustomModelAvailable = modelStatus && modelStatus.status !== 'unavailable';
-
-  // Load Dynamic Vocabulary from API
-  const loadVocabulary = useCallback(async () => {
-    try {
-      const data = await api.getVocabulary();
-      if (data && data.gestures) {
-        setVocabularyList(data.gestures);
-      }
-    } catch (err) {
-      console.warn('Failed to fetch vocabulary:', err);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadVocabulary();
-  }, [loadVocabulary]);
 
   // Initialize MediaPipe Gesture Recognizer on component mount
   useEffect(() => {
@@ -248,46 +240,139 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
     }
   }, [practiceTargetSign]);
 
-  // Speech Helper: English (stable callback, uses refs to avoid render cascades)
-  const handleSpeakEnglish = useCallback((customText?: string) => {
-    const textToSpeak = customText || smoothedRef.current.stableMeaning || lastAcceptedGestureRef.current?.meaning;
-    if (textToSpeak) {
+  // Language title helper
+  const getLanguageName = (lang: DisplayLanguageMode) => {
+    switch (lang) {
+      case 'te': return 'తెలుగు';
+      case 'ro': return 'Romanized Telugu';
+      case 'hi': return 'हिंदी';
+      case 'en':
+      default: return 'English';
+    }
+  };
+
+  // Get active single-language name for recognized gesture
+  const getGestureNameForLanguage = useCallback((
+    lang: DisplayLanguageMode,
+    meaning?: string | null,
+    telugu?: string | null,
+    teluguRo?: string | null,
+    hindi?: string | null
+  ): string => {
+    switch (lang) {
+      case 'te':
+        return telugu || meaning || '';
+      case 'ro':
+        return teluguRo || meaning || '';
+      case 'hi':
+        return hindi || meaning || '';
+      case 'en':
+      default:
+        return meaning || '';
+    }
+  }, []);
+
+  // Vocalize recognized gesture or custom text in the active selected language
+  const handleSpeak = useCallback((customText?: string) => {
+    const textToSpeak = customText || getGestureNameForLanguage(
+      displayLanguage,
+      smoothedRef.current.stableMeaning,
+      smoothedRef.current.stableTelugu,
+      smoothedRef.current.stableTeluguRomanized,
+      smoothedRef.current.stableHindi
+    );
+    if (!textToSpeak) return;
+
+    if (displayLanguage === 'te') {
+      const hasTeluguVoice = ttsService.hasTeluguVoice();
+      if (!hasTeluguVoice) {
+        setTtsNotice('Notice: Local browser lacks native Telugu voice pack. Pronouncing Romanized Telugu via phonetic fallback.');
+        setTimeout(() => setTtsNotice(null), 5000);
+      }
+      ttsService.speak(textToSpeak, 'te', smoothedRef.current.stableTeluguRomanized || undefined).catch((err) =>
+        console.warn('TTS speak error:', err)
+      );
+    } else if (displayLanguage === 'ro') {
+      ttsService.speak(textToSpeak, 'te-ro').catch((err) => console.warn('TTS speak error:', err));
+    } else if (displayLanguage === 'hi') {
+      const hasHindiVoice = ttsService.hasHindiVoice();
+      if (!hasHindiVoice) {
+        setTtsNotice('Notice: Local browser lacks native Hindi voice pack. Playing phonetic voice fallback.');
+        setTimeout(() => setTtsNotice(null), 5000);
+      }
+      ttsService.speak(textToSpeak, 'hi').catch((err) => console.warn('TTS speak error:', err));
+    } else {
       ttsService.speak(textToSpeak, 'en').catch((err) => console.warn('TTS speak error:', err));
     }
-  }, []);
-
-  // Speech Helper: Telugu (stable callback, uses refs to avoid render cascades)
-  const handleSpeakTelugu = useCallback((customTelugu?: string, customRomanized?: string) => {
-    const teText = customTelugu || smoothedRef.current.stableTelugu || lastAcceptedGestureRef.current?.telugu;
-    const roText = customRomanized || smoothedRef.current.stableTeluguRomanized || lastAcceptedGestureRef.current?.telugu_romanized;
-    if (!teText && !roText) return;
-
-    const hasTeluguVoice = ttsService.hasTeluguVoice();
-    if (!hasTeluguVoice) {
-      setTtsNotice('Notice: Local browser lacks native Telugu voice pack. Pronouncing Romanized Telugu via phonetic fallback.');
-      setTimeout(() => setTtsNotice(null), 5000);
-    }
-
-    ttsService.speak(teText || roText || '', 'te', roText || undefined).catch((err) =>
-      console.warn('TTS speak error:', err)
-    );
-  }, []);
+  }, [displayLanguage, getGestureNameForLanguage]);
 
   // Stop Speech Handler
   const handleStopSpeech = useCallback(() => {
     ttsService.stop();
   }, []);
 
+  // Confirm and save a compositional numerical sequence
+  const handleConfirmNumberSequence = useCallback(() => {
+    if (numberSequence.length === 0) return;
+    const evalResult = evaluateTokenSequence(numberSequence);
+    const timeFormatted = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+    // Save numerical sequence to history
+    api
+      .saveHistory({
+        predicted_label: `NUM_${evalResult.value.toString()}`,
+        english_meaning: `Number: ${evalResult.formatted} (${evalResult.inWords.en})`,
+        telugu: `సంఖ్య: ${evalResult.formatted} (${evalResult.inWords.te})`,
+        telugu_romanized: `Sankhya: ${evalResult.formatted} (${evalResult.inWords.ro})`,
+        hindi: `संख्या: ${evalResult.formatted} (${evalResult.inWords.hi})`,
+        confidence: 0.99,
+        recognition_mode: 'compositional_numerical'
+      })
+      .then(() => onPredictionSaved?.())
+      .catch(() => {});
+
+    setHistoryTrail((prev) => [
+      {
+        label: `NUM_${evalResult.value.toString()}`,
+        meaning: `Number: ${evalResult.formatted}`,
+        telugu: `సంఖ్య: ${evalResult.formatted}`,
+        telugu_romanized: `Sankhya: ${evalResult.formatted}`,
+        hindi: `संख्या: ${evalResult.formatted}`,
+        time: timeFormatted,
+        confidence: 0.99
+      },
+      ...prev.slice(0, 5)
+    ]);
+
+    // Vocalize confirmed number in active language
+    const wordInActiveLang =
+      displayLanguage === 'te'
+        ? evalResult.inWords.te
+        : displayLanguage === 'ro'
+        ? evalResult.inWords.ro
+        : displayLanguage === 'hi'
+        ? evalResult.inWords.hi
+        : evalResult.inWords.en;
+    handleSpeak(`${evalResult.formatted}. ${wordInActiveLang}`);
+
+    // Reset sequence
+    setNumberSequence([]);
+    numberDebouncer.reset();
+  }, [numberSequence, displayLanguage, handleSpeak, onPredictionSaved, numberDebouncer]);
+
   // Stop camera and reset smoothing
   const handleStopCamera = useCallback(() => {
     stopCamera();
     smoother.reset();
+    numberDebouncer.reset();
+    setNumberSequence([]);
     setRawPrediction(null);
     setSmoothed({
       stableLabel: null,
       stableMeaning: 'Recognition stopped',
       stableTelugu: null,
       stableTeluguRomanized: null,
+      stableHindi: null,
       smoothedConfidence: null,
       status: 'waiting',
       is_verified_isl: false,
@@ -297,7 +382,7 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
       agreementRatio: 0,
       allProbabilities: null
     });
-  }, [stopCamera, smoother]);
+  }, [stopCamera, smoother, numberDebouncer]);
 
   // Main Recognition Loop
   useEffect(() => {
@@ -313,6 +398,7 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
         english_meaning: 'Waiting for hand in frame...',
         telugu: null,
         telugu_romanized: null,
+        hindi: null,
         confidence: null,
         status: 'no_hand',
         is_verified_isl: false,
@@ -332,7 +418,6 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
       if (!videoRef.current || videoRef.current.readyState < 2) return;
 
       const now = performance.now();
-      // Throttle client-side inference to ~15-20 FPS for optimal battery and UI responsiveness
       if (now - lastCallTimeRef.current < 65) return;
       lastCallTimeRef.current = now;
 
@@ -352,31 +437,26 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
         const isNewLabel = smoothRes.stableLabel !== lastSpokenLabelRef.current;
         const isCooldownElapsed = currentTime - lastSpokenTimeRef.current > 2500;
 
-        // Auto-TTS speech policy
+        // Auto-TTS speech in user selected language
         if (autoSpeak && (isNewLabel || isCooldownElapsed)) {
           lastSpokenLabelRef.current = smoothRes.stableLabel;
           lastSpokenTimeRef.current = currentTime;
-          if (autoSpeakLang === 'te') {
-            handleSpeakTelugu(smoothRes.stableTelugu || undefined, smoothRes.stableTeluguRomanized || undefined);
-          } else {
-            handleSpeakEnglish(smoothRes.stableMeaning);
-          }
+          handleSpeak();
         }
 
-        // Update last accepted gesture
         const timeFormatted = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         setLastAcceptedGesture({
           label: smoothRes.stableLabel,
           meaning: smoothRes.stableMeaning,
           telugu: smoothRes.stableTelugu,
           telugu_romanized: smoothRes.stableTeluguRomanized,
+          hindi: smoothRes.stableHindi,
           timestamp: timeFormatted,
           confidence: smoothRes.smoothedConfidence,
           model_version: smoothRes.model_version || 'Pretrained v0.10',
           gesture_type: smoothRes.gesture_type || 'static'
         });
 
-        // Deduplicated history trail
         if (isNewLabel) {
           setHistoryTrail((prev) => [
             {
@@ -384,6 +464,7 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
               meaning: smoothRes.stableMeaning!,
               telugu: smoothRes.stableTelugu,
               telugu_romanized: smoothRes.stableTeluguRomanized,
+              hindi: smoothRes.stableHindi,
               time: timeFormatted,
               confidence: smoothRes.smoothedConfidence
             },
@@ -394,6 +475,9 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
             .saveHistory({
               predicted_label: smoothRes.stableLabel,
               english_meaning: smoothRes.stableMeaning,
+              telugu: smoothRes.stableTelugu ?? undefined,
+              telugu_romanized: smoothRes.stableTeluguRomanized ?? undefined,
+              hindi: smoothRes.stableHindi ?? undefined,
               confidence: smoothRes.smoothedConfidence ?? undefined,
               recognition_mode: 'pretrained_mediapipe'
             })
@@ -404,7 +488,7 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
       return;
     }
 
-    // 3. Mode B: Custom ISL Classifier (Backend Trained Random Forest)
+    // 3. Mode B: Custom ISL Classifier (Backend Trained Random Forest with 66 classes)
     if (recognitionMode === 'custom_isl') {
       if (!isCustomModelAvailable) {
         const unavailResult: PredictionResult = {
@@ -413,6 +497,7 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
           english_meaning: 'Custom ISL model unavailable',
           telugu: null,
           telugu_romanized: null,
+          hindi: null,
           confidence: null,
           status: 'model_unavailable',
           is_verified_isl: false,
@@ -428,7 +513,6 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
       }
 
       const now = performance.now();
-      // Throttle backend inference to ~3.8 FPS (every 260ms) with in-flight guard
       if (now - lastCallTimeRef.current < 260 || inFlightRef.current) return;
       lastCallTimeRef.current = now;
       inFlightRef.current = true;
@@ -458,14 +542,31 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
             const isNewLabel = smoothRes.stableLabel !== lastSpokenLabelRef.current;
             const isCooldownElapsed = currentTime - lastSpokenTimeRef.current > 2500;
 
+            // Numerical gesture composition: append to multi-digit sequence if debouncer permits
+            if (isNumericalGesture(smoothRes.stableLabel)) {
+              if (numberDebouncer.shouldCommit(smoothRes.stableLabel, currentTime)) {
+                const info = GESTURE_TO_NUMBER_TOKEN[smoothRes.stableLabel];
+                if (info) {
+                  setNumberSequence((prev) => [
+                    ...prev,
+                    {
+                      type: info.type,
+                      value: info.value,
+                      multiplierKey: info.multiplierKey,
+                      label: info.label,
+                      sourceGesture: smoothRes.stableLabel!,
+                      timestamp: currentTime
+                    }
+                  ]);
+                }
+              }
+            }
+
+            // Auto-TTS speech in user's selected language
             if (autoSpeak && (isNewLabel || isCooldownElapsed)) {
               lastSpokenLabelRef.current = smoothRes.stableLabel;
               lastSpokenTimeRef.current = currentTime;
-              if (autoSpeakLang === 'te') {
-                handleSpeakTelugu(smoothRes.stableTelugu || undefined, smoothRes.stableTeluguRomanized || undefined);
-              } else {
-                handleSpeakEnglish(smoothRes.stableMeaning);
-              }
+              handleSpeak();
             }
 
             const timeFormatted = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -474,6 +575,7 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
               meaning: smoothRes.stableMeaning,
               telugu: smoothRes.stableTelugu,
               telugu_romanized: smoothRes.stableTeluguRomanized,
+              hindi: smoothRes.stableHindi,
               timestamp: timeFormatted,
               confidence: smoothRes.smoothedConfidence,
               model_version: smoothRes.model_version || modelStatus?.active_version || 'v1.0.0',
@@ -487,6 +589,7 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
                   meaning: smoothRes.stableMeaning!,
                   telugu: smoothRes.stableTelugu,
                   telugu_romanized: smoothRes.stableTeluguRomanized,
+                  hindi: smoothRes.stableHindi,
                   time: timeFormatted,
                   confidence: smoothRes.smoothedConfidence
                 },
@@ -497,6 +600,9 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
                 .saveHistory({
                   predicted_label: smoothRes.stableLabel,
                   english_meaning: smoothRes.stableMeaning,
+                  telugu: smoothRes.stableTelugu ?? undefined,
+                  telugu_romanized: smoothRes.stableTeluguRomanized ?? undefined,
+                  hindi: smoothRes.stableHindi ?? undefined,
                   confidence: smoothRes.smoothedConfidence ?? undefined,
                   recognition_mode: 'custom_isl_rf'
                 })
@@ -525,36 +631,17 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
     handedness,
     threshold,
     autoSpeak,
-    autoSpeakLang,
+    displayLanguage,
     isCustomModelAvailable,
     isPretrainedReady,
     pretrainedError,
     smoother,
     videoRef,
     modelStatus,
-    handleSpeakEnglish,
-    handleSpeakTelugu,
-    onPredictionSaved
+    handleSpeak,
+    onPredictionSaved,
+    numberDebouncer
   ]);
-
-  // Filtered vocabulary for Cheat Sheet
-  const filteredVocabulary = useMemo(() => {
-    return vocabularyList.filter((item) => {
-      if (vocabTypeFilter === 'verified_isl' && item.gesture_type !== 'verified_isl') return false;
-      if (vocabTypeFilter === 'static' && item.gesture_type !== 'static') return false;
-      if (vocabTypeFilter === 'dynamic' && item.gesture_type !== 'dynamic') return false;
-
-      if (vocabSearch) {
-        const q = vocabSearch.toLowerCase();
-        const matchName = item.name.toLowerCase().includes(q);
-        const matchTe = (item.telugu || '').toLowerCase().includes(q);
-        const matchRo = (item.telugu_romanized || '').toLowerCase().includes(q);
-        const matchId = item.id.toLowerCase().includes(q);
-        if (!matchName && !matchTe && !matchRo && !matchId) return false;
-      }
-      return true;
-    });
-  }, [vocabularyList, vocabTypeFilter, vocabSearch]);
 
   return (
     <div className="camera-panel-grid">
@@ -996,90 +1083,54 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
               <button
                 className={`btn ${autoSpeak ? 'btn-primary' : 'btn-secondary'}`}
                 onClick={() => setAutoSpeak(!autoSpeak)}
-                style={{ padding: '6px 10px', fontSize: '0.75rem' }}
-                title="Automatically vocalize accepted gestures"
+                style={{ padding: '6px 12px', fontSize: '0.78rem' }}
+                title="Automatically vocalize accepted gestures in the selected language"
               >
-                {autoSpeak ? <Volume2 size={13} /> : <VolumeX size={13} />}
+                {autoSpeak ? <Volume2 size={14} /> : <VolumeX size={14} />}
                 <span>Auto-Speak: {autoSpeak ? 'ON' : 'OFF'}</span>
               </button>
-
-              {autoSpeak && (
-                <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: '6px', padding: '2px', border: '1px solid #e2e8f0' }}>
-                  <button
-                    onClick={() => setAutoSpeakLang('en')}
-                    style={{
-                      padding: '4px 8px',
-                      fontSize: '0.7rem',
-                      border: 'none',
-                      borderRadius: '4px',
-                      background: autoSpeakLang === 'en' ? '#2563eb' : 'transparent',
-                      color: autoSpeakLang === 'en' ? '#ffffff' : 'var(--text-secondary)',
-                      fontWeight: autoSpeakLang === 'en' ? 600 : 400,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    EN
-                  </button>
-                  <button
-                    onClick={() => setAutoSpeakLang('te')}
-                    style={{
-                      padding: '4px 8px',
-                      fontSize: '0.7rem',
-                      border: 'none',
-                      borderRadius: '4px',
-                      background: autoSpeakLang === 'te' ? '#0284c7' : 'transparent',
-                      color: autoSpeakLang === 'te' ? '#ffffff' : 'var(--text-secondary)',
-                      fontWeight: autoSpeakLang === 'te' ? 600 : 400,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    తెలుగు
-                  </button>
-                </div>
-              )}
             </div>
           </div>
 
-          {/* Synchronized Output Language Selector in Results Panel */}
+          {/* User-Controlled Language Selection (PART 3) */}
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
               gap: '10px',
-              padding: '8px 14px',
+              padding: '10px 14px',
               background: '#f8fafc',
               borderRadius: '8px',
               border: '1px solid var(--border-subtle)',
-              marginBottom: '14px',
+              marginBottom: '16px',
               flexWrap: 'wrap'
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-secondary)', fontSize: '0.78rem' }}>
-              <Languages size={15} color="#2563eb" />
-              <span style={{ fontWeight: 600 }}>Output Language:</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)', fontSize: '0.84rem' }}>
+              <Languages size={17} color="#2563eb" />
+              <span style={{ fontWeight: 600 }}>Preferred Output Language:</span>
             </div>
 
             <select
               value={displayLanguage}
               onChange={(e) => setDisplayLanguage(e.target.value as DisplayLanguageMode)}
               style={{
-                padding: '5px 10px',
+                padding: '6px 12px',
                 borderRadius: '6px',
                 border: '1px solid #cbd5e1',
                 background: '#ffffff',
-                fontSize: '0.78rem',
+                fontSize: '0.82rem',
                 fontWeight: 600,
                 color: '#1d4ed8',
                 cursor: 'pointer',
                 outline: 'none'
               }}
             >
-              <option value="all">All Languages (Side-by-Side)</option>
-              <option value="en">English (English)</option>
-              <option value="te">తెలుగు (Telugu Script)</option>
-              <option value="ro">Romanized Telugu (Phonetic)</option>
-              <option value="hi">हिंदी (Hindi Script)</option>
+              <option value="en">English</option>
+              <option value="te">తెలుగు (Telugu script)</option>
+              <option value="ro">Romanized Telugu</option>
+              <option value="hi">हिंदी (Hindi)</option>
             </select>
           </div>
 
@@ -1173,98 +1224,48 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
             </div>
           </div>
 
-          {/* Large Current Gesture Display */}
+          {/* Large Current Gesture Display (PART 2: ONE GESTURE = ONE NAME) */}
           {recognitionState === 'gesture_detected' ? (
-            <div style={{ marginBottom: '20px' }}>
-              {/* Telugu Script Translation (Prominent Display) */}
-              {(displayLanguage === 'all' || displayLanguage === 'te') && smoothed.stableTelugu && (
-                <div style={{ marginBottom: '8px' }}>
-                  <div style={{ fontSize: '0.74rem', color: '#0284c7', fontWeight: 600, textTransform: 'uppercase' }}>
-                    తెలుగు (Telugu Script)
-                  </div>
-                  <div
-                    style={{
-                      fontSize: '2.2rem',
-                      fontWeight: 800,
-                      lineHeight: 1.2,
-                      color: '#1d4ed8',
-                      fontFamily: '"Anek Telugu", "Noto Sans Telugu", sans-serif'
-                    }}
-                  >
-                    {smoothed.stableTelugu}
-                  </div>
-                </div>
-              )}
+            <div
+              style={{
+                marginBottom: '20px',
+                padding: '24px 20px',
+                borderRadius: '12px',
+                background: 'linear-gradient(135deg, #f0fdf4 0%, #eff6ff 100%)',
+                border: '1px solid #bbf7d0',
+                textAlign: 'center'
+              }}
+            >
+              <div
+                style={{
+                  fontSize: '0.78rem',
+                  color: 'var(--text-muted)',
+                  textTransform: 'uppercase',
+                  fontWeight: 700,
+                  letterSpacing: '0.05em',
+                  marginBottom: '8px'
+                }}
+              >
+                Recognized Gesture ({getLanguageName(displayLanguage)})
+              </div>
 
-              {/* English Meaning */}
-              {(displayLanguage === 'all' || displayLanguage === 'en') && (
-                <div style={{ marginBottom: '6px' }}>
-                  <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                    English Output
-                  </div>
-                  <h1 style={{ fontSize: displayLanguage === 'en' ? '2.2rem' : '1.45rem', color: 'var(--text-primary)', fontWeight: 700, margin: 0, lineHeight: 1.2 }}>
-                    {smoothed.stableMeaning}
-                  </h1>
-                </div>
-              )}
-
-              {/* Romanized Telugu */}
-              {(displayLanguage === 'all' || displayLanguage === 'ro') && smoothed.stableTeluguRomanized && (
-                <div style={{ marginBottom: '8px' }}>
-                  <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                    Romanized Telugu
-                  </div>
-                  <div style={{ fontSize: displayLanguage === 'ro' ? '1.8rem' : '1.05rem', color: '#475569', fontStyle: 'italic', fontWeight: 600 }}>
-                    "{smoothed.stableTeluguRomanized}"
-                  </div>
-                </div>
-              )}
-
-              {/* Meta Tags: Raw Label, Verification, Consensus */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginTop: '10px' }}>
-                <span className="badge badge-primary" style={{ fontSize: '0.76rem' }}>
-                  Label: {smoothed.stableLabel}
-                </span>
-
-                {/* Clear distinction: Verified ISL Sign vs General Gesture */}
-                {smoothed.is_verified_isl ? (
-                  <span
-                    className="badge badge-success"
-                    style={{
-                      fontSize: '0.74rem',
-                      background: '#ecfdf5',
-                      border: '1px solid #10b981',
-                      color: '#047857',
-                      fontWeight: 700
-                    }}
-                  >
-                    ✓ Verified ISL Sign
-                  </span>
-                ) : (
-                  <span className="badge badge-neutral" style={{ fontSize: '0.72rem', color: '#0284c7' }}>
-                    ✋ General Gesture
-                  </span>
+              {/* ONE SINGLE LARGE NAME */}
+              <div
+                style={{
+                  fontSize: '2.8rem',
+                  fontWeight: 800,
+                  lineHeight: 1.2,
+                  color: '#1d4ed8',
+                  fontFamily: displayLanguage === 'te' ? '"Anek Telugu", "Noto Sans Telugu", sans-serif' : 'inherit'
+                }}
+              >
+                {getGestureNameForLanguage(
+                  displayLanguage,
+                  smoothed.stableMeaning,
+                  smoothed.stableTelugu,
+                  smoothed.stableTeluguRomanized,
+                  smoothed.stableHindi
                 )}
-
-                {/* Two-Hand Sign Badge */}
-                {(smoothed.gesture_type === 'two_hand_isl' || rawPrediction?.hands_detected === 2 || smoothed.stableLabel?.includes('2HAND') || smoothed.stableLabel?.includes('BOOK') || smoothed.stableLabel?.includes('HOUSE') || smoothed.stableLabel?.includes('CLAP')) && (
-                  <span
-                    className="badge"
-                    style={{
-                      fontSize: '0.72rem',
-                      background: '#eff6ff',
-                      border: '1px solid #3b82f6',
-                      color: '#1d4ed8',
-                      fontWeight: 600
-                    }}
-                  >
-                    🙌 Two-Hand Sign
-                  </span>
-                )}
-
-                <span className="badge badge-neutral" style={{ fontSize: '0.72rem' }}>
-                  Consensus: {Math.round(smoothed.agreementRatio * 100)}%
-                </span>
               </div>
             </div>
           ) : recognitionState === 'unknown_gesture' ? (
@@ -1273,7 +1274,7 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
                 <AlertTriangle size={18} />
                 <strong style={{ fontSize: '1.05rem' }}>Unknown / Unsupported Gesture</strong>
               </div>
-              <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+              <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.4, margin: 0 }}>
                 Hand shape is ambiguous or confidence {rawPrediction?.confidence ? `(${Math.round(rawPrediction.confidence * 100)}%)` : ''} is below the {Math.round(threshold * 100)}% threshold gate. The system will not guess or invent labels for unknown gestures.
               </p>
             </div>
@@ -1283,7 +1284,7 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
                 <AlertTriangle size={18} />
                 <strong style={{ fontSize: '1.05rem' }}>Model Unavailable</strong>
               </div>
-              <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+              <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.4, margin: 0 }}>
                 {recognitionMode === 'custom_isl'
                   ? 'No trained custom model file was found on the backend. You can switch to Pretrained General Gestures.'
                   : pretrainedError || 'Pretrained model file failed to load.'}
@@ -1306,9 +1307,7 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
                 {handsCount === 2 ? 'Both Hands Tracked in Frame' : 'Hand Visible in Camera'}
               </h4>
               <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)', maxWidth: '300px', margin: '0 auto' }}>
-                {handsCount === 2
-                  ? 'Perform a supported two-hand sign (Namaste, Book, House, Clap, or Help) to classify.'
-                  : 'Hold a supported sign steady in the frame to classify.'}
+                Hold a supported sign steady in the frame to classify.
               </p>
             </div>
           ) : (
@@ -1321,9 +1320,95 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
               </h4>
               <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)', maxWidth: '280px', margin: '0 auto' }}>
                 {isCameraActive
-                  ? 'Hold up your hand facing the camera to automatically identify gestures in English and Telugu.'
+                  ? 'Hold up your hand facing the camera to automatically identify gestures.'
                   : 'Click Start Camera above to begin real-time recognition.'}
               </p>
+            </div>
+          )}
+
+          {/* PART 4: Numerical Gesture Recognition & Sequence Builder (1 to 1,000,000,000+) */}
+          {numberSequence.length > 0 && (
+            <div
+              style={{
+                marginBottom: '20px',
+                padding: '16px',
+                borderRadius: '10px',
+                background: '#f8fafc',
+                border: '1px solid #bfdbfe'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Hash size={18} color="#2563eb" />
+                  <span style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                    Numerical Sequence ({numberSequence.length} sign{numberSequence.length > 1 ? 's' : ''})
+                  </span>
+                </div>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => setNumberSequence((prev) => prev.slice(0, -1))}
+                    style={{ padding: '4px 8px', fontSize: '0.72rem' }}
+                    title="Remove last numerical sign"
+                  >
+                    Backspace
+                  </button>
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => {
+                      setNumberSequence([]);
+                      numberDebouncer.reset();
+                    }}
+                    style={{ padding: '4px 8px', fontSize: '0.72rem' }}
+                    title="Clear number sequence"
+                  >
+                    Clear
+                  </button>
+                  <button
+                    className="btn btn-primary"
+                    onClick={handleConfirmNumberSequence}
+                    style={{ padding: '4px 10px', fontSize: '0.72rem', background: '#059669', borderColor: '#059669' }}
+                    title="Confirm and vocalize the composed number"
+                  >
+                    ✓ Confirm Number
+                  </button>
+                </div>
+              </div>
+
+              {/* Sequence Tokens in Order */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' }}>
+                {numberSequence.map((tok, idx) => (
+                  <span
+                    key={idx}
+                    className="badge badge-primary"
+                    style={{
+                      fontSize: '0.76rem',
+                      padding: '4px 8px',
+                      background: tok.type === 'multiplier' ? '#dbeafe' : '#e0e7ff',
+                      color: tok.type === 'multiplier' ? '#1e40af' : '#3730a3',
+                      border: '1px solid #c7d2fe'
+                    }}
+                  >
+                    {tok.label}
+                  </span>
+                ))}
+              </div>
+
+              {/* Computed Value & In-Words Translation */}
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a' }}>
+                  {numericalEval.formatted}
+                </span>
+                <span style={{ fontSize: '0.86rem', color: '#0369a1', fontStyle: 'italic', fontWeight: 600 }}>
+                  ({displayLanguage === 'te'
+                    ? numericalEval.inWords.te
+                    : displayLanguage === 'ro'
+                    ? numericalEval.inWords.ro
+                    : displayLanguage === 'hi'
+                    ? numericalEval.inWords.hi
+                    : numericalEval.inWords.en})
+                </span>
+              </div>
             </div>
           )}
 
@@ -1352,33 +1437,23 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
             </div>
           )}
 
-          {/* Audio Speech Controls Group */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '8px', marginBottom: '16px' }}>
+          {/* Audio Speech Controls */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '8px', marginBottom: '16px' }}>
             <button
-              className="btn btn-secondary"
-              onClick={() => handleSpeakEnglish()}
+              className="btn btn-primary"
+              onClick={() => handleSpeak()}
               disabled={!smoothed.stableMeaning && !lastAcceptedGesture}
-              style={{ padding: '9px 12px', fontSize: '0.8rem', justifyContent: 'center' }}
+              style={{ padding: '9px 12px', fontSize: '0.82rem', justifyContent: 'center' }}
             >
-              <Volume2 size={15} color="#2563eb" />
-              <span>Speak English</span>
-            </button>
-
-            <button
-              className="btn btn-secondary"
-              onClick={() => handleSpeakTelugu()}
-              disabled={(!smoothed.stableTelugu && !lastAcceptedGesture?.telugu) && (!smoothed.stableTeluguRomanized && !lastAcceptedGesture?.telugu_romanized)}
-              style={{ padding: '9px 12px', fontSize: '0.8rem', justifyContent: 'center' }}
-            >
-              <Volume2 size={15} color="#0284c7" />
-              <span>Speak తెలుగు</span>
+              <Volume2 size={16} />
+              <span>Speak ({getLanguageName(displayLanguage)})</span>
             </button>
 
             <button
               className="btn btn-secondary"
               onClick={handleStopSpeech}
               title="Stop current speech synthesis"
-              style={{ padding: '9px 12px', fontSize: '0.8rem' }}
+              style={{ padding: '9px 12px', fontSize: '0.82rem' }}
             >
               <Square size={14} color="#ef4444" />
             </button>
@@ -1403,12 +1478,15 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
                 <Clock size={15} color="#059669" />
                 <div>
                   <span style={{ color: 'var(--text-muted)' }}>Last Recognized: </span>
-                  <strong style={{ color: 'var(--text-primary)' }}>{lastAcceptedGesture.meaning}</strong>
-                  {lastAcceptedGesture.telugu && (
-                    <span style={{ color: '#0284c7', marginLeft: '6px' }}>
-                      ({lastAcceptedGesture.telugu})
-                    </span>
-                  )}
+                  <strong style={{ color: 'var(--text-primary)' }}>
+                    {getGestureNameForLanguage(
+                      displayLanguage,
+                      lastAcceptedGesture.meaning,
+                      lastAcceptedGesture.telugu,
+                      lastAcceptedGesture.telugu_romanized,
+                      lastAcceptedGesture.hindi
+                    )}
+                  </strong>
                 </div>
               </div>
               <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
@@ -1475,15 +1553,15 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
                     border: idx === 0 ? '1px solid #bfdbfe' : undefined
                   }}
                 >
-                  <strong style={{ color: 'var(--text-primary)' }}>{item.meaning}</strong>
-                  {item.telugu && (
-                    <span style={{ color: '#0284c7', marginLeft: '5px' }}>({item.telugu})</span>
-                  )}
-                  {item.confidence && (
-                    <span style={{ color: '#059669', marginLeft: '6px', fontSize: '0.7rem' }}>
-                      {Math.round(item.confidence * 100)}%
-                    </span>
-                  )}
+                  <strong style={{ color: 'var(--text-primary)' }}>
+                    {getGestureNameForLanguage(
+                      displayLanguage,
+                      item.meaning,
+                      item.telugu,
+                      item.telugu_romanized,
+                      item.hindi
+                    )}
+                  </strong>
                   <span style={{ color: 'var(--text-muted)', marginLeft: '6px', fontSize: '0.7rem' }}>
                     {item.time}
                   </span>
@@ -1492,119 +1570,6 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
             </div>
           </div>
         )}
-
-        {/* Dynamic Vocabulary Cheat Sheet & Translation Guide */}
-        <div className="glass-panel" style={{ padding: '18px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Languages size={16} color="#2563eb" />
-              <span style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                Configured Multilingual Vocabulary
-              </span>
-            </div>
-            <span className="badge badge-neutral" style={{ fontSize: '0.7rem' }}>
-              {filteredVocabulary.length} Gestures
-            </span>
-          </div>
-
-          {/* Search & Filter Toolbar */}
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
-            <div style={{ position: 'relative', flex: 1, minWidth: '160px' }}>
-              <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-              <input
-                type="text"
-                value={vocabSearch}
-                onChange={(e) => setVocabSearch(e.target.value)}
-                placeholder="Search English or Telugu..."
-                style={{
-                  width: '100%',
-                  padding: '6px 10px 6px 30px',
-                  borderRadius: '6px',
-                  background: '#ffffff',
-                  border: '1px solid var(--border-subtle)',
-                  color: 'var(--text-primary)',
-                  fontSize: '0.76rem'
-                }}
-              />
-            </div>
-
-            <div style={{ display: 'flex', gap: '4px' }}>
-              {(['all', 'verified_isl', 'static', 'dynamic'] as const).map((filter) => (
-                <button
-                  key={filter}
-                  onClick={() => setVocabTypeFilter(filter)}
-                  style={{
-                    padding: '4px 8px',
-                    fontSize: '0.7rem',
-                    borderRadius: '5px',
-                    border: 'none',
-                    background: vocabTypeFilter === filter ? '#2563eb' : '#f1f5f9',
-                    color: vocabTypeFilter === filter ? '#ffffff' : 'var(--text-secondary)',
-                    fontWeight: vocabTypeFilter === filter ? 600 : 400,
-                    cursor: 'pointer'
-                  }}
-                >
-                  {filter === 'all' && 'All'}
-                  {filter === 'verified_isl' && 'ISL Only'}
-                  {filter === 'static' && 'Static'}
-                  {filter === 'dynamic' && 'Dynamic'}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Vocabulary Cards List */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '220px', overflowY: 'auto' }}>
-            {filteredVocabulary.map((entry) => (
-              <div
-                key={entry.id}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '7px 10px',
-                  borderRadius: '6px',
-                  background: '#ffffff',
-                  border: '1px solid var(--border-subtle)',
-                  fontSize: '0.75rem'
-                }}
-              >
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <strong style={{ color: 'var(--text-primary)' }}>{entry.name}</strong>
-                    <span style={{ color: '#0284c7', fontWeight: 600 }}>{entry.telugu}</span>
-                    <span style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.7rem' }}>
-                      ({entry.telugu_romanized})
-                    </span>
-                  </div>
-                  <div style={{ color: 'var(--text-muted)', fontSize: '0.68rem', marginTop: '2px' }}>
-                    ID: {entry.id} • {entry.gesture_type} • {entry.sample_count || 0} samples
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span
-                    className={`badge ${
-                      entry.readiness === 'active_trained'
-                        ? 'badge-success'
-                        : entry.readiness === 'pretrained_supported'
-                        ? 'badge-primary'
-                        : entry.readiness === 'ready_to_train'
-                        ? 'badge-warning'
-                        : 'badge-neutral'
-                    }`}
-                    style={{ fontSize: '0.65rem' }}
-                  >
-                    {entry.readiness === 'active_trained' && 'Active Trained'}
-                    {entry.readiness === 'pretrained_supported' && 'Pretrained'}
-                    {entry.readiness === 'ready_to_train' && 'Ready to Train'}
-                    {entry.readiness === 'needs_data' && 'Needs Data'}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
     </div>
   );

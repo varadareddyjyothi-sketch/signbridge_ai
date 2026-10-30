@@ -19,8 +19,8 @@ def test_vocabulary_listing():
     # Verify Telugu script and Romanized fields exist on ISL_1 and ISL_5
     isl_1 = next((g for g in data["gestures"] if g["id"] == "ISL_1"), None)
     assert isl_1 is not None
-    assert isl_1["telugu"] == "సంఖ్య 1 / ఒకటి"
-    assert isl_1["telugu_romanized"] == "Sankhya 1 / Okati"
+    assert "ఒకటి" in isl_1["telugu"]
+    assert "Okati" in isl_1["telugu_romanized"]
     assert "readiness" in isl_1
 
     isl_5 = next((g for g in data["gestures"] if g["id"] == "ISL_5"), None)

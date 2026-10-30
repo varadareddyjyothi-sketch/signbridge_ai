@@ -202,6 +202,9 @@ export const api = {
   async saveHistory(entry: {
     predicted_label: string;
     english_meaning: string;
+    telugu?: string;
+    telugu_romanized?: string;
+    hindi?: string;
     confidence?: number;
     recognition_mode?: string;
     user_id?: string;

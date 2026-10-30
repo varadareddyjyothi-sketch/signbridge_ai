@@ -14,6 +14,7 @@ export interface PredictionResult {
   english_meaning: string | null;
   telugu?: string | null;
   telugu_romanized?: string | null;
+  hindi?: string | null;
   confidence: number | null;
   status: 'accepted' | 'uncertain_rejected' | 'no_hand' | 'model_unavailable' | 'error';
   is_verified_isl: boolean;
@@ -32,6 +33,7 @@ export interface HistoryItem {
   english_meaning: string;
   telugu?: string;
   telugu_romanized?: string;
+  hindi?: string;
   confidence?: number | null;
   recognition_mode: string;
   created_at: string;

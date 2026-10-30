@@ -6,22 +6,36 @@ Provides graceful error handling and disconnection recovery.
 """
 
 from typing import Optional, Dict, Any
-from pymongo import MongoClient, ASCENDING, DESCENDING
-from pymongo.database import Database
-from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
-from backend.app.config import settings
-
 import time
 
-_mongo_client: Optional[MongoClient] = None
-_mongo_db: Optional[Database] = None
+try:
+    from pymongo import MongoClient, ASCENDING, DESCENDING
+    from pymongo.database import Database
+    from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
+    PYMONGO_AVAILABLE = True
+except ImportError:
+    class MongoClient:  # type: ignore
+        def __init__(self, *args, **kwargs): pass
+    Database = Any  # type: ignore
+    ASCENDING = 1
+    DESCENDING = -1
+    ConnectionFailure = Exception  # type: ignore
+    ServerSelectionTimeoutError = Exception  # type: ignore
+    PYMONGO_AVAILABLE = False
+
+from backend.app.config import settings
+
+_mongo_client: Optional[Any] = None
+_mongo_db: Optional[Any] = None
 _is_connected: bool = False
 _last_connect_failure_time: float = 0.0
 _CONNECT_RETRY_INTERVAL_SECONDS: float = 30.0
 
 
-def init_mongo_indexes(db: Database) -> None:
+def init_mongo_indexes(db: Any) -> None:
     """Ensures necessary indexes and constraints are created in MongoDB collections."""
+    if not PYMONGO_AVAILABLE or db is None:
+        return
     try:
         # Users collection indexes: unique email and user ID
         db.users.create_index([("email", ASCENDING)], unique=True)
@@ -52,9 +66,12 @@ def init_mongo_indexes(db: Database) -> None:
         print(f"[MongoDB] Index creation warning: {e}")
 
 
-def get_mongo_client() -> Optional[MongoClient]:
+def get_mongo_client() -> Optional[Any]:
     """Retrieves or initializes the singleton PyMongo client with retry cooldown."""
     global _mongo_client, _mongo_db, _is_connected, _last_connect_failure_time
+
+    if not PYMONGO_AVAILABLE:
+        return None
 
     if _mongo_client is not None:
         return _mongo_client

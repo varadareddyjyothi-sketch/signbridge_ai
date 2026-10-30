@@ -113,7 +113,7 @@ class VocabularyService:
 
     def get_multilingual_mapping(self, gesture_id: str) -> Dict[str, str]:
         """
-        Returns English, Telugu script, and Romanized Telugu for a recognized gesture ID.
+        Returns English, Telugu script, Romanized Telugu, and Hindi for a recognized gesture ID.
         """
         g = self.get_gesture_by_id(gesture_id)
         if g:
@@ -121,6 +121,7 @@ class VocabularyService:
                 "english": g.get("name", gesture_id),
                 "telugu": g.get("telugu", gesture_id),
                 "telugu_romanized": g.get("telugu_romanized", gesture_id),
+                "hindi": g.get("hindi", gesture_id),
                 "gesture_type": g.get("gesture_type", "static"),
                 "is_verified_isl": g.get("gesture_type") == "verified_isl"
             }
@@ -131,6 +132,7 @@ class VocabularyService:
             "english": clean_id,
             "telugu": clean_id,
             "telugu_romanized": clean_id,
+            "hindi": clean_id,
             "gesture_type": "static",
             "is_verified_isl": False
         }

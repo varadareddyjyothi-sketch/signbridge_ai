@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { Navbar, type AppNavTab } from './components/Navbar';
 import { HomeScreen } from './components/HomeScreen';
 import { CameraRecognitionPanel } from './components/CameraRecognitionPanel';
-import { TwoWaySpeechPanel } from './components/TwoWaySpeechPanel';
 import { HistoryLog } from './components/HistoryLog';
 import { ISLGuide } from './components/ISLGuide';
 import { AuthModal } from './components/AuthModal';
@@ -260,17 +259,12 @@ export function App() {
 
         {/* View 2: Live Recognition & Sentence Builder - PROTECTED MODULE */}
         {!isAuthChecking && !isNotFound && activeTab === 'recognition' && currentUser && (
-          <div>
             <CameraRecognitionPanel
               modelStatus={modelStatus}
               practiceTargetSign={practiceTargetSign}
               onClearPracticeTarget={() => setPracticeTargetSign(null)}
               onPredictionSaved={refreshSystemStatus}
             />
-
-            {/* Two-Way Communication Bridge */}
-            <TwoWaySpeechPanel />
-          </div>
         )}
 
         {/* View 3: ISL Guide - PROTECTED MODULE */}
