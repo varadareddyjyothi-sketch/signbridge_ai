@@ -300,12 +300,12 @@ export function useWebcamHands(): UseWebcamHandsReturn {
       locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
     });
 
-    // Configure for TWO HANDS detection
+    // Configure for TWO HANDS detection with robust tracking
     hands.setOptions({
       maxNumHands: 2,
       modelComplexity: 1,
-      minDetectionConfidence: 0.6,
-      minTrackingConfidence: 0.5
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.45
     });
 
     hands.onResults((results: any) => {

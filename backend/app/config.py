@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     MODEL_DIR: str = str(BASE_DIR / "ml" / "models")
     MODEL_FILE: str = "signbridge_rf_model.joblib"
     METADATA_FILE: str = "model_metadata.json"
-    CONFIDENCE_THRESHOLD: float = 0.65
+    CONFIDENCE_THRESHOLD: float = 0.40
 
     DATASET_PATH: str = str(BASE_DIR / "ml" / "dataset" / "isl_landmarks_dataset.csv")
 

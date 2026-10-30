@@ -138,7 +138,8 @@ export const api = {
 
     if (features && features.length === 63) {
       payload.features = features;
-    } else if (landmarks) {
+    }
+    if (landmarks && landmarks.length > 0) {
       payload.landmarks = landmarks;
     }
 

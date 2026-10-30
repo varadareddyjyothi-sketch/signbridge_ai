@@ -242,14 +242,23 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span>{currentUser.display_name}</span>
             </button>
           ) : (
-            <button
-              onClick={onOpenAuth}
-              className="btn btn-primary"
-              style={{ padding: '6px 12px', fontSize: '0.82rem' }}
-            >
-              <LogIn size={14} />
-              <span>Sign In</span>
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button
+                onClick={onOpenAuth}
+                className="btn btn-secondary"
+                style={{ padding: '6px 12px', fontSize: '0.82rem' }}
+              >
+                <LogIn size={14} />
+                <span>Sign In</span>
+              </button>
+              <button
+                onClick={onOpenAuth}
+                className="btn btn-primary"
+                style={{ padding: '6px 14px', fontSize: '0.82rem', fontWeight: 700 }}
+              >
+                <span>Get Started</span>
+              </button>
+            </div>
           )}
 
           {/* Mobile Menu Hamburger Button */}

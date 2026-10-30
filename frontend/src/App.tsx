@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Navbar, type AppNavTab } from './components/Navbar';
 import { HomeScreen } from './components/HomeScreen';
+import { WelcomeScreen } from './components/WelcomeScreen';
 import { CameraRecognitionPanel } from './components/CameraRecognitionPanel';
 import { HistoryLog } from './components/HistoryLog';
 import { ISLGuide } from './components/ISLGuide';
@@ -25,7 +26,7 @@ function parseCurrentRoute(): ParsedRoute {
 
   const segment = hash || pathname.replace(/^\//, '');
 
-  if (!segment || segment === 'home' || segment === '') {
+  if (!segment || segment === 'home' || segment === 'welcome' || segment === '') {
     return { tab: 'home', isNotFound: false, openAuth: false, path: '/' };
   }
   if (segment === 'recognition' || segment === 'dashboard' || segment === 'live') {
@@ -62,6 +63,7 @@ export function App() {
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [isAuthChecking, setIsAuthChecking] = useState<boolean>(() => Boolean(api.getAuthToken()));
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(() => routeState.openAuth);
+  const [authModalInitialMode, setAuthModalInitialMode] = useState<'login' | 'register'>('login');
   const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
   const [pendingRedirectTab, setPendingRedirectTab] = useState<AppNavTab | null>(null);
 
@@ -223,7 +225,10 @@ export function App() {
         health={health}
         modelStatus={modelStatus}
         currentUser={currentUser}
-        onOpenAuth={() => setIsAuthModalOpen(true)}
+        onOpenAuth={() => {
+          setAuthModalInitialMode('login');
+          setIsAuthModalOpen(true);
+        }}
         onOpenProfile={() => setIsProfileModalOpen(true)}
       />
 
@@ -244,17 +249,37 @@ export function App() {
           />
         )}
 
-        {/* View 1: Welcome & Landing Screen */}
+        {/* View 1: Welcome Page for unauthenticated visitors / Home Screen for authenticated users */}
         {!isAuthChecking && !isNotFound && activeTab === 'home' && (
-          <HomeScreen
-            onStartCommunicating={handleStartCommunicating}
-            onOpenQuickPhrases={handleOpenQuickPhrases}
-            onExploreGuide={handleExploreGuide}
-            modelStatus={modelStatus}
-            health={health}
-            currentUser={currentUser}
-            onOpenAuth={() => setIsAuthModalOpen(true)}
-          />
+          currentUser ? (
+            <HomeScreen
+              onStartCommunicating={handleStartCommunicating}
+              onOpenQuickPhrases={handleOpenQuickPhrases}
+              onExploreGuide={handleExploreGuide}
+              modelStatus={modelStatus}
+              health={health}
+              currentUser={currentUser}
+              onOpenAuth={() => {
+                setAuthModalInitialMode('login');
+                setIsAuthModalOpen(true);
+              }}
+            />
+          ) : (
+            <WelcomeScreen
+              onGetStarted={() => {
+                setAuthModalInitialMode('register');
+                setIsAuthModalOpen(true);
+              }}
+              onSignIn={() => {
+                setAuthModalInitialMode('login');
+                setIsAuthModalOpen(true);
+              }}
+              onSignUp={() => {
+                setAuthModalInitialMode('register');
+                setIsAuthModalOpen(true);
+              }}
+            />
+          )
         )}
 
         {/* View 2: Live Recognition & Sentence Builder - PROTECTED MODULE */}
@@ -282,6 +307,7 @@ export function App() {
       {/* Auth Modal */}
       <AuthModal
         isOpen={isAuthModalOpen}
+        initialMode={authModalInitialMode}
         onClose={() => {
           setIsAuthModalOpen(false);
           setPendingRedirectTab(null);

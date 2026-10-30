@@ -1,5 +1,5 @@
 import React from 'react';
-import { Camera, BookOpen, MessageSquare, CheckCircle2, ArrowRight, Sparkles, Globe, Lock } from 'lucide-react';
+import { Camera, BookOpen, MessageSquare, ArrowRight, Sparkles, Lock } from 'lucide-react';
 import type { ModelStatus, HealthStatus, UserProfile } from '../types';
 
 interface HomeScreenProps {
@@ -16,13 +16,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onStartCommunicating,
   onOpenQuickPhrases,
   onExploreGuide,
-  modelStatus,
-  health,
   currentUser
 }) => {
-  const isOnline = health?.status === 'healthy';
-  const isModelReady = modelStatus && modelStatus.status !== 'unavailable';
-  const supportedCount = modelStatus?.classes_count || 15;
 
   return (
     <div style={{ maxWidth: '960px', margin: '0 auto', padding: '12px 0 40px 0' }}>
@@ -127,43 +122,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </div>
         )}
 
-        {/* System & Model Live Status Pill */}
-        <div style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '16px',
-          flexWrap: 'wrap',
-          justifyContent: 'center',
-          padding: '8px 16px',
-          borderRadius: '8px',
-          background: '#f8fafc',
-          border: '1px solid #e2e8f0',
-          fontSize: '0.82rem'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{
-              width: '8px',
-              height: '8px',
-              borderRadius: '50%',
-              background: isOnline ? '#059669' : '#e11d48'
-            }} />
-            <span style={{ color: '#475569' }}>System: <strong style={{ color: '#0f172a' }}>{isOnline ? 'Online' : 'Connecting...'}</strong></span>
-          </div>
-
-          <div style={{ width: '1px', height: '14px', background: '#e2e8f0' }} />
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <CheckCircle2 size={14} color={isModelReady ? '#059669' : '#d97706'} />
-            <span style={{ color: '#475569' }}>Model: <strong style={{ color: '#0f172a' }}>{isModelReady ? `${supportedCount} Active Signs Loaded` : 'Evaluation Mode'}</strong></span>
-          </div>
-
-          <div style={{ width: '1px', height: '14px', background: '#e2e8f0' }} />
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Globe size={14} color="#0284c7" />
-            <span style={{ color: '#475569' }}>Languages: <strong style={{ color: '#0f172a' }}>English, Telugu (తెలుగు), Romanized</strong></span>
-          </div>
-        </div>
       </div>
 
       {/* 3-Step Simple Guide for New Users */}

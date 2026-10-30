@@ -37,7 +37,7 @@ export class TemporalPredictionSmoother {
   private lastStableGestureType: 'static' | 'dynamic' | 'verified_isl' | 'two_hand_isl' | 'general_gesture' = 'static';
   private lastStableVersion: string = 'v1.0.0';
 
-  constructor(windowSize = 5, minAgreementRatio = 0.6) {
+  constructor(windowSize = 4, minAgreementRatio = 0.5) {
     this.windowSize = windowSize;
     this.minAgreementRatio = minAgreementRatio;
   }
@@ -165,8 +165,14 @@ export class TemporalPredictionSmoother {
 
     const agreementRatio = this.buffer.length > 0 ? bestCount / this.buffer.length : 0;
 
-    // Check consensus criteria
-    if (bestLabel && agreementRatio >= this.minAgreementRatio) {
+    // Check consensus criteria: accept if agreement meets ratio, OR 2+ frames agree, OR 1 frame with high confidence (>=0.55)
+    const isConsensusReached =
+      bestLabel &&
+      (agreementRatio >= this.minAgreementRatio ||
+        (bestCount >= 2 && bestAvgConf >= 0.38) ||
+        (bestCount >= 1 && bestAvgConf >= 0.55));
+
+    if (bestLabel && isConsensusReached) {
       this.lastStableLabel = bestLabel;
       this.lastStableMeaning = bestMeaning;
       this.lastStableTelugu = bestTelugu;

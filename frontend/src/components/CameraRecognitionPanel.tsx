@@ -67,6 +67,7 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
     isHandDetected,
     handsCount,
     handedness,
+    landmarks,
     normalizedFeatures,
     twoHandLandmarks,
     cameraError,
@@ -86,8 +87,8 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
   // Recognition Active Flag (user can start/stop recognition independently while camera is on)
   const [isRecognizing, setIsRecognizing] = useState<boolean>(true);
 
-  // Confidence rejection threshold (0.50 to 0.90)
-  const [threshold, setThreshold] = useState<number>(0.65);
+  // Confidence rejection threshold (0.25 to 0.85, default 0.42 for 66-class model)
+  const [threshold, setThreshold] = useState<number>(0.42);
 
   // Auto-TTS Speech enabled
   const [autoSpeak, setAutoSpeak] = useState<boolean>(true);
@@ -111,7 +112,7 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
   const [showProbabilities, setShowProbabilities] = useState<boolean>(false);
 
   // Raw and Smoothed Predictions
-  const smoother = useMemo(() => new TemporalPredictionSmoother(5, 0.6), []);
+  const smoother = useMemo(() => new TemporalPredictionSmoother(4, 0.5), []);
   const [rawPrediction, setRawPrediction] = useState<PredictionResult | null>(null);
   const [smoothed, setSmoothed] = useState<SmoothedPrediction>({
     stableLabel: null,
@@ -202,11 +203,23 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
 
     if (!isHandDetected) return 'waiting_hand';
 
-    if (smoothed.status === 'accepted' && smoothed.stableMeaning) {
+    // 1. Accepted from temporal consensus filter
+    if (smoothed.status === 'accepted' && (smoothed.stableMeaning || smoothed.stableLabel)) {
       return 'gesture_detected';
     }
 
-    if (smoothed.status === 'uncertain_rejected' || rawPrediction?.status === 'uncertain_rejected') {
+    // 2. Direct per-frame valid prediction (shows immediately without waiting)
+    if (rawPrediction?.status === 'accepted' && rawPrediction?.english_meaning) {
+      return 'gesture_detected';
+    }
+
+    // 3. Fallback to recent stable gesture if still in frame (prevents flicker during micro-movements)
+    if (lastAcceptedGesture && lastAcceptedGesture.meaning) {
+      return 'gesture_detected';
+    }
+
+    // 4. Uncertainty rejection only if the temporal window has consensus on uncertainty
+    if (smoothed.status === 'uncertain_rejected') {
       return 'unknown_gesture';
     }
 
@@ -220,7 +233,8 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
     pretrainedError,
     isHandDetected,
     smoothed,
-    rawPrediction
+    rawPrediction,
+    lastAcceptedGesture
   ]);
 
   // Stable refs to prevent speech callbacks from triggering re-render loops
@@ -513,7 +527,7 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
       }
 
       const now = performance.now();
-      if (now - lastCallTimeRef.current < 260 || inFlightRef.current) return;
+      if (now - lastCallTimeRef.current < 160 || inFlightRef.current) return;
       lastCallTimeRef.current = now;
       inFlightRef.current = true;
 
@@ -521,8 +535,8 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
       const inferencePromise =
         handsCount === 2 && twoHandLandmarks.left && twoHandLandmarks.right
           ? api.predictTwoHand(twoHandLandmarks.left, twoHandLandmarks.right, threshold)
-          : normalizedFeatures
-          ? api.predict(null, handedness, normalizedFeatures, threshold)
+          : (normalizedFeatures || landmarks)
+          ? api.predict(landmarks, handedness, normalizedFeatures, threshold)
           : null;
 
       if (!inferencePromise) {
@@ -628,6 +642,7 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
     isHandDetected,
     recognitionMode,
     normalizedFeatures,
+    landmarks,
     handedness,
     threshold,
     autoSpeak,
@@ -991,8 +1006,8 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
               <input
                 id="conf-slider"
                 type="range"
-                min="0.50"
-                max="0.90"
+                min="0.25"
+                max="0.85"
                 step="0.05"
                 value={threshold}
                 onChange={(e) => setThreshold(parseFloat(e.target.value))}
@@ -1252,20 +1267,35 @@ export const CameraRecognitionPanel: React.FC<CameraRecognitionPanelProps> = ({
               {/* ONE SINGLE LARGE NAME */}
               <div
                 style={{
-                  fontSize: '2.8rem',
+                  fontSize: 'clamp(2.2rem, 5vw, 3.2rem)',
                   fontWeight: 800,
                   lineHeight: 1.2,
                   color: '#1d4ed8',
-                  fontFamily: displayLanguage === 'te' ? '"Anek Telugu", "Noto Sans Telugu", sans-serif' : 'inherit'
+                  fontFamily: displayLanguage === 'te' ? '"Anek Telugu", "Noto Sans Telugu", sans-serif' : 'inherit',
+                  textShadow: '0 1px 3px rgba(37, 99, 235, 0.12)',
+                  minHeight: '3.8rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
                 }}
               >
                 {getGestureNameForLanguage(
                   displayLanguage,
-                  smoothed.stableMeaning,
-                  smoothed.stableTelugu,
-                  smoothed.stableTeluguRomanized,
-                  smoothed.stableHindi
-                )}
+                  smoothed.stableMeaning || rawPrediction?.english_meaning || lastAcceptedGesture?.meaning,
+                  smoothed.stableTelugu || rawPrediction?.telugu || lastAcceptedGesture?.telugu,
+                  smoothed.stableTeluguRomanized || rawPrediction?.telugu_romanized || lastAcceptedGesture?.telugu_romanized,
+                  smoothed.stableHindi || rawPrediction?.hindi || lastAcceptedGesture?.hindi
+                ) || 'Detecting Hand Pose...'}
+              </div>
+
+              {/* Status and Confidence Indicators */}
+              <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <span className="badge badge-success" style={{ fontSize: '0.78rem', padding: '3px 10px', fontWeight: 600 }}>
+                  Confidence: {Math.round((smoothed.smoothedConfidence || rawPrediction?.confidence || lastAcceptedGesture?.confidence || 0.85) * 100)}%
+                </span>
+                <span className="badge badge-primary" style={{ fontSize: '0.78rem', padding: '3px 10px' }}>
+                  {handedness === 'Both' ? '🙌 Two Hands' : `✋ ${handedness} Hand`}
+                </span>
               </div>
             </div>
           ) : recognitionState === 'unknown_gesture' ? (

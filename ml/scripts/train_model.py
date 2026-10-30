@@ -158,7 +158,7 @@ def train(
         "test_accuracy": test_acc,
         "classification_report": report,
         "confusion_matrix": cm,
-        "confidence_rejection_threshold": 0.65,
+        "confidence_rejection_threshold": 0.40,
         "retrain_command": "python ml/scripts/train_model.py",
         "known_limitations": [
             "Trained strictly on validated ISL kinematic hand landmark feature vectors.",

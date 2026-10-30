@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Lock, Mail, User, Globe, AlertCircle, CheckCircle2, ArrowRight } from 'lucide-react';
 import { api } from '../services/api';
 import type { UserProfile } from '../types';
@@ -24,6 +24,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setMode(initialMode);
+      setErrorMsg(null);
+      setSuccessMsg(null);
+    }
+  }, [isOpen, initialMode]);
 
   if (!isOpen) return null;
 
