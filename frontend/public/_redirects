@@ -1,0 +1,3 @@
+# Single Page Application SPA fallback rewrite rule
+# Ensures direct navigation and refresh on /recognition, /history, /guide never 404
+/*    /index.html   200

@@ -11,9 +11,13 @@ from pymongo.database import Database
 from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
 from backend.app.config import settings
 
+import time
+
 _mongo_client: Optional[MongoClient] = None
 _mongo_db: Optional[Database] = None
 _is_connected: bool = False
+_last_connect_failure_time: float = 0.0
+_CONNECT_RETRY_INTERVAL_SECONDS: float = 30.0
 
 
 def init_mongo_indexes(db: Database) -> None:
@@ -49,29 +53,35 @@ def init_mongo_indexes(db: Database) -> None:
 
 
 def get_mongo_client() -> Optional[MongoClient]:
-    """Retrieves or initializes the singleton PyMongo client."""
-    global _mongo_client, _mongo_db, _is_connected
+    """Retrieves or initializes the singleton PyMongo client with retry cooldown."""
+    global _mongo_client, _mongo_db, _is_connected, _last_connect_failure_time
 
     if _mongo_client is not None:
         return _mongo_client
+
+    # If recent connection attempt failed, don't block subsequent requests during cooldown
+    now = time.time()
+    if now - _last_connect_failure_time < _CONNECT_RETRY_INTERVAL_SECONDS:
+        return None
 
     uri = (settings.MONGODB_URI or "").strip()
     if not uri or not (uri.startswith("mongodb://") or uri.startswith("mongodb+srv://")):
         return None
 
     try:
-        # Connect with 5-second server selection timeout for resilient startup
+        # Connect with server selection timeout for resilient startup
         _mongo_client = MongoClient(
             uri,
-            serverSelectionTimeoutMS=5000,
-            connectTimeoutMS=5000,
-            socketTimeoutMS=5000,
+            serverSelectionTimeoutMS=3000,
+            connectTimeoutMS=3000,
+            socketTimeoutMS=3000,
             maxPoolSize=50,
             retryWrites=True
         )
         # Test connection ping
         _mongo_client.admin.command('ping')
         _is_connected = True
+        _last_connect_failure_time = 0.0
 
         db_name = settings.MONGODB_DB_NAME or "signbridge_ai"
         _mongo_db = _mongo_client[db_name]
@@ -79,11 +89,13 @@ def get_mongo_client() -> Optional[MongoClient]:
         print(f"[MongoDB] Successfully connected to MongoDB Atlas database: '{db_name}'.")
         return _mongo_client
     except (ConnectionFailure, ServerSelectionTimeoutError, Exception) as e:
+        _last_connect_failure_time = time.time()
         print(f"[MongoDB] Connection to MongoDB failed ({e}). Operating in resilient fallback mode.")
         _mongo_client = None
         _mongo_db = None
         _is_connected = False
         return None
+
 
 
 def get_mongo_db() -> Optional[Database]:

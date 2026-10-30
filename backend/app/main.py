@@ -4,6 +4,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from backend.app.config import settings
 from backend.app.api import health, predict, history, dataset, vocabulary, models, sentence, auth
 from backend.app.database.local_storage import init_local_db
@@ -48,60 +49,141 @@ app.include_router(models.router)
 app.include_router(sentence.router)
 
 
+# API Route Prefixes that must NEVER return HTML or SPA fallbacks
+API_ROUTE_PREFIXES = (
+    "/health",
+    "/docs",
+    "/redoc",
+    "/openapi.json",
+    "/auth",
+    "/predict",
+    "/history",
+    "/models",
+    "/dataset",
+    "/vocabulary",
+    "/translate",
+    "/api"
+)
+
+
+@app.exception_handler(StarletteHTTPException)
+async def custom_http_exception_handler(request: Request, exc: StarletteHTTPException):
+    """
+    Ensures unknown API endpoints return structured JSON 404s, never HTML.
+    For non-API browser navigation, falls back to SPA index.html when built.
+    """
+    if exc.status_code == 404:
+        path = request.url.path
+        if any(path == prefix or path.startswith(f"{prefix}/") for prefix in API_ROUTE_PREFIXES) or "application/json" in request.headers.get("accept", ""):
+            return JSONResponse(
+                status_code=404,
+                content={"detail": f"API endpoint '{path}' not found", "status_code": 404}
+            )
+
+        index_file = os.path.join(settings.STATIC_DIR, "index.html")
+        accept = request.headers.get("accept", "")
+        if request.method == "GET" and os.path.isfile(index_file) and ("text/html" in accept or "*/*" in accept or not accept):
+            return FileResponse(index_file, headers={"Cache-Control": "no-cache"})
+
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+
+
 @app.get("/api", tags=["Root"])
+async def api_root():
+    """Returns core API metadata and health link."""
+    return {
+        "app": settings.APP_NAME,
+        "version": settings.APP_VERSION,
+        "documentation": "/docs",
+        "health": "/health",
+        "endpoints": {
+            "auth": "/auth",
+            "predict": "/predict",
+            "history": "/history",
+            "models": "/models",
+            "dataset": "/dataset",
+            "vocabulary": "/vocabulary",
+            "translate": "/translate"
+        }
+    }
+
+
 @app.get("/", tags=["Root"])
 async def root(request: Request):
     """
-    Root endpoint: Returns API metadata JSON when requested by API clients / tests,
-    or serves the single-page application index.html when visited from a web browser.
+    Root endpoint: Serves the single-page application index.html when available,
+    or returns API metadata JSON when requested by API clients / tests.
     """
-    accept = request.headers.get("accept", "")
     index_path = os.path.join(settings.STATIC_DIR, "index.html")
-    if "text/html" in accept and os.path.exists(index_path):
-        return FileResponse(index_path)
+    accept = request.headers.get("accept", "")
+    
+    # If frontend build exists and browser specifically requests HTML navigation
+    if os.path.isfile(index_path) and "text/html" in accept and "application/json" not in accept:
+        return FileResponse(index_path, headers={"Cache-Control": "no-cache"})
 
     return {
         "app": settings.APP_NAME,
         "version": settings.APP_VERSION,
         "documentation": "/docs",
-        "health": "/health"
+        "health": "/health",
+        "environment": settings.ENVIRONMENT,
+        "frontend_built": os.path.isfile(index_path)
     }
 
 
-# Mount production frontend assets and SPA routes if built
+# Static Assets Mounting
 static_dist = settings.STATIC_DIR
-if os.path.exists(static_dist) and os.path.isdir(static_dist):
-    assets_dir = os.path.join(static_dist, "assets")
-    if os.path.exists(assets_dir):
-        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+assets_dir = os.path.join(static_dist, "assets")
+if os.path.exists(assets_dir) and os.path.isdir(assets_dir):
+    app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
 
-    for static_sub in ["models", "wasm"]:
-        sub_path = os.path.join(static_dist, static_sub)
-        if os.path.exists(sub_path):
-            app.mount(f"/{static_sub}", StaticFiles(directory=sub_path), name=static_sub)
+for static_sub in ["models", "wasm"]:
+    sub_path = os.path.join(static_dist, static_sub)
+    if os.path.exists(sub_path) and os.path.isdir(sub_path):
+        app.mount(f"/{static_sub}", StaticFiles(directory=sub_path), name=static_sub)
 
-    @app.get("/{full_path:path}", include_in_schema=False)
-    async def serve_spa(request: Request, full_path: str):
-        # Exclude reserved API/system endpoints from SPA catch-all
-        if full_path in ["health", "docs", "redoc", "openapi.json"] or full_path.startswith("api/"):
-            return JSONResponse(status_code=404, content={"detail": "Not found"})
 
-        target_file = os.path.join(static_dist, full_path)
-        if os.path.isfile(target_file):
-            return FileResponse(target_file)
+@app.get("/{full_path:path}", include_in_schema=False)
+async def serve_spa_and_static(request: Request, full_path: str):
+    """
+    Handles SPA client-side routes and static files.
+    Ensures API endpoints NEVER return HTML pages, providing clean JSON 404s.
+    """
+    normalized_path = f"/{full_path}"
 
-        index_file = os.path.join(static_dist, "index.html")
+    # 1. API Route Protection: Unknown API calls must return JSON 404, never HTML
+    if any(normalized_path == prefix or normalized_path.startswith(f"{prefix}/") for prefix in API_ROUTE_PREFIXES):
+        return JSONResponse(
+            status_code=404,
+            content={"detail": f"API endpoint '{normalized_path}' not found", "status_code": 404}
+        )
+
+    # 2. Check for physical static asset in dist directory (e.g. logo.png, favicon.ico, etc.)
+    target_file = os.path.join(settings.STATIC_DIR, full_path)
+    if os.path.isfile(target_file):
+        return FileResponse(target_file)
+
+    # 3. Check for index.html for SPA client-side routing fallback (e.g. /recognition, /history, /guide)
+    index_file = os.path.join(settings.STATIC_DIR, "index.html")
+    if os.path.isfile(index_file):
+        # Only serve index.html for browser-acceptable navigation requests
         accept = request.headers.get("accept", "")
-        if "text/html" in accept and os.path.isfile(index_file):
-            return FileResponse(index_file)
+        if "text/html" in accept or "*/*" in accept or not accept:
+            return FileResponse(index_file, headers={"Cache-Control": "no-cache"})
 
-        if os.path.isfile(index_file):
-            return FileResponse(index_file)
-
-        return JSONResponse(status_code=404, content={"detail": f"Path '{full_path}' not found"})
+    # 4. If neither physical asset nor SPA build exists, return structured JSON 404
+    return JSONResponse(
+        status_code=404,
+        content={
+            "detail": f"Path '{normalized_path}' not found.",
+            "status_code": 404,
+            "frontend_built": os.path.isfile(index_file)
+        }
+    )
 
 
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("backend.app.main:app", host=settings.HOST, port=settings.PORT, reload=settings.DEBUG)
+
 

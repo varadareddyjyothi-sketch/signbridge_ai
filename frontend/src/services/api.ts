@@ -22,8 +22,23 @@ import type {
   QuickPhraseListResponse
 } from '../types';
 
-const rawBase = import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.PROD ? '' : 'http://localhost:8000');
-const API_BASE = typeof rawBase === 'string' && rawBase.endsWith('/') ? rawBase.slice(0, -1) : rawBase;
+function resolveApiBase(): string {
+  const envUrl = import.meta.env.VITE_API_BASE_URL;
+  if (typeof envUrl === 'string' && envUrl.trim().length > 0) {
+    const trimmed = envUrl.trim();
+    return trimmed.endsWith('/') ? trimmed.slice(0, -1) : trimmed;
+  }
+
+  // In local development or local preview, default to local backend on port 8000
+  if (!import.meta.env.PROD) {
+    return 'http://localhost:8000';
+  }
+
+  // In production: empty string means same-origin relative calls (unified container or reverse proxy)
+  return '';
+}
+
+const API_BASE = resolveApiBase();
 const TOKEN_KEY = 'signbridge_auth_token';
 
 function getStoredToken(): string | null {
@@ -56,12 +71,44 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutM
       throw new Error('Server request timed out (10s). Please check your internet or backend connection.');
     }
     if (err?.message === 'Failed to fetch' || err instanceof TypeError) {
-      throw new Error('Cannot connect to SignBridge backend at ' + API_BASE + '. Please ensure the server is running on port 8000.');
+      const target = API_BASE || window.location.origin;
+      throw new Error(
+        `Cannot connect to SignBridge backend at ${target}. Please verify backend server availability and network connectivity.`
+      );
     }
     throw err;
   } finally {
     clearTimeout(id);
   }
+}
+
+async function safeJsonParse(response: Response, endpointDesc: string): Promise<any> {
+  const contentType = response.headers.get('content-type') || '';
+  if (!response.ok) {
+    if (response.status === 404) {
+      if (!API_BASE && (window.location.hostname.includes('vercel.app') || window.location.hostname.includes('netlify.app'))) {
+        throw new Error(
+          `SignBridge backend not configured for this domain (HTTP 404). Please set VITE_API_BASE_URL in your hosting platform dashboard.`
+        );
+      }
+      throw new Error(`API endpoint '${endpointDesc}' not found (HTTP 404).`);
+    }
+
+    if (contentType.includes('application/json')) {
+      const errJson = await response.json().catch(() => null);
+      throw new Error(errJson?.detail || `${endpointDesc} failed (HTTP ${response.status})`);
+    }
+    throw new Error(`${endpointDesc} failed (HTTP ${response.status})`);
+  }
+
+  // If response is OK but returned HTML instead of JSON (e.g. SPA fallback on unknown route)
+  if (!contentType.includes('application/json') && contentType.includes('text/html')) {
+    throw new Error(
+      `Received HTML instead of JSON for '${endpointDesc}'. Ensure the backend API server is online and route is mapped.`
+    );
+  }
+
+  return response.json();
 }
 
 export const api = {
@@ -71,18 +118,12 @@ export const api = {
 
   async getHealth(): Promise<HealthStatus> {
     const res = await fetchWithTimeout(`${API_BASE}/health`);
-    if (!res.ok) {
-      throw new Error(`Health check failed: HTTP ${res.status}`);
-    }
-    return res.json();
+    return safeJsonParse(res, 'Health check');
   },
 
   async getModelStatus(): Promise<ModelStatus> {
     const res = await fetchWithTimeout(`${API_BASE}/model/status`);
-    if (!res.ok) {
-      throw new Error(`Model status check failed: HTTP ${res.status}`);
-    }
-    return res.json();
+    return safeJsonParse(res, 'Model status');
   },
 
   async predict(

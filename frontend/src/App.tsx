@@ -7,11 +7,54 @@ import { HistoryLog } from './components/HistoryLog';
 import { ISLGuide } from './components/ISLGuide';
 import { AuthModal } from './components/AuthModal';
 import { UserProfileModal } from './components/UserProfileModal';
+import { NotFoundPage } from './components/NotFoundPage';
 import { api } from './services/api';
 import type { HealthStatus, ModelStatus, UserProfile } from './types';
 
+interface ParsedRoute {
+  tab: AppNavTab;
+  isNotFound: boolean;
+  openAuth: boolean;
+  authMode?: 'login' | 'register';
+  path: string;
+}
+
+function parseCurrentRoute(): ParsedRoute {
+  // Support both HTML5 path (/recognition) and hash routing (/#recognition or #library)
+  const pathname = window.location.pathname.toLowerCase();
+  const hash = window.location.hash.toLowerCase().replace(/^#\/?/, '');
+
+  const segment = hash || pathname.replace(/^\//, '');
+
+  if (!segment || segment === 'home' || segment === '') {
+    return { tab: 'home', isNotFound: false, openAuth: false, path: '/' };
+  }
+  if (segment === 'recognition' || segment === 'dashboard') {
+    return { tab: 'recognition', isNotFound: false, openAuth: false, path: '/recognition' };
+  }
+  if (segment === 'guide' || segment === 'library') {
+    return { tab: 'guide', isNotFound: false, openAuth: false, path: '/guide' };
+  }
+  if (segment === 'history') {
+    return { tab: 'history', isNotFound: false, openAuth: false, path: '/history' };
+  }
+  if (segment === 'login' || segment === 'signin') {
+    return { tab: 'home', isNotFound: false, openAuth: true, authMode: 'login', path: '/login' };
+  }
+  if (segment === 'register' || segment === 'signup') {
+    return { tab: 'home', isNotFound: false, openAuth: true, authMode: 'register', path: '/register' };
+  }
+
+  // If path doesn't match known routes and is not index.html
+  if (segment === 'index.html') {
+    return { tab: 'home', isNotFound: false, openAuth: false, path: '/' };
+  }
+
+  return { tab: 'home', isNotFound: true, openAuth: false, path: window.location.pathname || `/${segment}` };
+}
+
 export function App() {
-  const [activeTab, setActiveTab] = useState<AppNavTab>('home');
+  const [routeState, setRouteState] = useState<ParsedRoute>(() => parseCurrentRoute());
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [modelStatus, setModelStatus] = useState<ModelStatus | null>(null);
   const [practiceTargetSign, setPracticeTargetSign] = useState<{ id: string; name: string } | null>(null);
@@ -19,8 +62,51 @@ export function App() {
   // User Authentication State & Session Loading
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [isAuthChecking, setIsAuthChecking] = useState<boolean>(() => Boolean(api.getAuthToken()));
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(() => routeState.openAuth);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
+  const [pendingRedirectTab, setPendingRedirectTab] = useState<AppNavTab | null>(null);
+
+  const activeTab = routeState.tab;
+  const isNotFound = routeState.isNotFound;
+
+  // Navigate helper with browser History API synchronization
+  const navigate = useCallback((tab: AppNavTab) => {
+    const targetPath = tab === 'home' ? '/' : `/${tab}`;
+    try {
+      if (window.location.pathname !== targetPath) {
+        window.history.pushState({}, '', targetPath);
+      }
+    } catch {
+      // Fallback to hash if pushState fails in certain sandboxed environments
+      window.location.hash = `#/${tab}`;
+    }
+
+    setRouteState({
+      tab,
+      isNotFound: false,
+      openAuth: false,
+      path: targetPath
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
+  // Listen to browser Back / Forward buttons and Hash changes
+  useEffect(() => {
+    const handleLocationChange = () => {
+      const parsed = parseCurrentRoute();
+      setRouteState(parsed);
+      if (parsed.openAuth) {
+        setIsAuthModalOpen(true);
+      }
+    };
+
+    window.addEventListener('popstate', handleLocationChange);
+    window.addEventListener('hashchange', handleLocationChange);
+    return () => {
+      window.removeEventListener('popstate', handleLocationChange);
+      window.removeEventListener('hashchange', handleLocationChange);
+    };
+  }, []);
 
   // Check and restore existing session on startup without logging user out on refresh
   useEffect(() => {
@@ -41,13 +127,14 @@ export function App() {
     }
   }, []);
 
-  // Route Guard: Unauthenticated users cannot access protected tabs
+  // Route Guard: Unauthenticated users attempting to access protected tabs are prompted to authenticate
   useEffect(() => {
-    if (!isAuthChecking && !currentUser && activeTab !== 'home') {
-      setActiveTab('home');
+    if (!isAuthChecking && !currentUser && activeTab !== 'home' && !isNotFound) {
+      setPendingRedirectTab(activeTab);
+      navigate('home');
       setIsAuthModalOpen(true);
     }
-  }, [currentUser, activeTab, isAuthChecking]);
+  }, [currentUser, activeTab, isAuthChecking, isNotFound, navigate]);
 
   // Load backend and model status
   const refreshSystemStatus = useCallback(async () => {
@@ -74,47 +161,47 @@ export function App() {
 
   const handleStartCommunicating = () => {
     if (!currentUser) {
+      setPendingRedirectTab('recognition');
       setIsAuthModalOpen(true);
       return;
     }
-    setActiveTab('recognition');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    navigate('recognition');
   };
 
   const handleOpenQuickPhrases = () => {
     if (!currentUser) {
+      setPendingRedirectTab('recognition');
       setIsAuthModalOpen(true);
       return;
     }
-    setActiveTab('recognition');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    navigate('recognition');
   };
 
   const handleExploreGuide = () => {
     if (!currentUser) {
+      setPendingRedirectTab('guide');
       setIsAuthModalOpen(true);
       return;
     }
-    setActiveTab('guide');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    navigate('guide');
   };
 
   const handlePractiseSign = (signId: string, signName: string) => {
     if (!currentUser) {
+      setPendingRedirectTab('recognition');
       setIsAuthModalOpen(true);
       return;
     }
     setPracticeTargetSign({ id: signId, name: signName });
-    setActiveTab('recognition');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    navigate('recognition');
   };
 
   const handleAuthSuccess = (user: UserProfile) => {
     setCurrentUser(user);
     setIsAuthModalOpen(false);
-    // After login, redirect users to the dashboard
-    setActiveTab('recognition');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    const destination = pendingRedirectTab || 'recognition';
+    setPendingRedirectTab(null);
+    navigate(destination);
   };
 
   const handleProfileUpdated = (updatedUser: UserProfile) => {
@@ -125,9 +212,7 @@ export function App() {
     await api.logout();
     setCurrentUser(null);
     setIsProfileModalOpen(false);
-    // After logout, redirect users to the welcome page
-    setActiveTab('home');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    navigate('home');
   };
 
   return (
@@ -135,7 +220,7 @@ export function App() {
       {/* Top Navbar */}
       <Navbar
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={navigate}
         health={health}
         modelStatus={modelStatus}
         currentUser={currentUser}
@@ -152,8 +237,16 @@ export function App() {
           </div>
         )}
 
+        {/* 404 Route Not Found View */}
+        {!isAuthChecking && isNotFound && (
+          <NotFoundPage
+            attemptedPath={routeState.path}
+            onNavigate={navigate}
+          />
+        )}
+
         {/* View 1: Welcome & Landing Screen */}
-        {!isAuthChecking && activeTab === 'home' && (
+        {!isAuthChecking && !isNotFound && activeTab === 'home' && (
           <HomeScreen
             onStartCommunicating={handleStartCommunicating}
             onOpenQuickPhrases={handleOpenQuickPhrases}
@@ -166,7 +259,7 @@ export function App() {
         )}
 
         {/* View 2: Live Recognition & Sentence Builder - PROTECTED MODULE */}
-        {!isAuthChecking && activeTab === 'recognition' && currentUser && (
+        {!isAuthChecking && !isNotFound && activeTab === 'recognition' && currentUser && (
           <div>
             <CameraRecognitionPanel
               modelStatus={modelStatus}
@@ -181,7 +274,7 @@ export function App() {
         )}
 
         {/* View 3: ISL Guide - PROTECTED MODULE */}
-        {!isAuthChecking && activeTab === 'guide' && currentUser && (
+        {!isAuthChecking && !isNotFound && activeTab === 'guide' && currentUser && (
           <ISLGuide
             onPractiseSign={handlePractiseSign}
             activeModelClasses={modelStatus?.classes || []}
@@ -189,13 +282,16 @@ export function App() {
         )}
 
         {/* View 4: Conversation History & Excel Export - PROTECTED MODULE */}
-        {!isAuthChecking && activeTab === 'history' && currentUser && <HistoryLog currentUser={currentUser} />}
+        {!isAuthChecking && !isNotFound && activeTab === 'history' && currentUser && <HistoryLog currentUser={currentUser} />}
       </main>
 
       {/* Auth Modal */}
       <AuthModal
         isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
+        onClose={() => {
+          setIsAuthModalOpen(false);
+          setPendingRedirectTab(null);
+        }}
         onAuthSuccess={handleAuthSuccess}
       />
 
@@ -245,3 +341,4 @@ export function App() {
 }
 
 export default App;
+

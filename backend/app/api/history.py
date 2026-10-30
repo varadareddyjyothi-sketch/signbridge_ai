@@ -3,10 +3,12 @@ Recognition History & Confirmed Sentence Endpoints
 Includes genuine Excel (.xlsx) export with formula sanitization.
 """
 
+import os
 from typing import Optional
 from datetime import datetime, timezone
-from fastapi import APIRouter, Query, Header, HTTPException, Depends
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Query, Header, HTTPException, Depends, Request
+from fastapi.responses import StreamingResponse, FileResponse
+from backend.app.config import settings
 from backend.app.schemas.history import (
     HistoryResponse,
     HistoryCreateRequest,
@@ -29,10 +31,17 @@ router = APIRouter(prefix="/history", tags=["History & Export"])
 
 @router.get("", response_model=HistoryResponse)
 async def get_history(
+    request: Request,
     limit: int = Query(50, ge=1, le=200, description="Max records to retrieve"),
     current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
-    """Retrieves sign recognition history for the current user or guest."""
+    """Retrieves sign recognition history for the current user or guest, or serves SPA index.html for browser navigation."""
+    accept = request.headers.get("accept", "")
+    index_path = os.path.join(settings.STATIC_DIR, "index.html")
+    # If visited from a browser address bar (Accept text/html and not JSON-first)
+    if "text/html" in accept and "application/json" not in accept and os.path.isfile(index_path):
+        return FileResponse(index_path, headers={"Cache-Control": "no-cache"})
+
     effective_user_id = current_user["id"] if current_user else None
     items = history_service.get_history(user_id=effective_user_id, limit=limit)
     return HistoryResponse(
@@ -41,6 +50,7 @@ async def get_history(
         storage_mode=history_service.get_current_storage_mode(),
         cloud_connected=history_service.is_cloud_connected()
     )
+
 
 
 @router.post("", response_model=HistoryEntry)
