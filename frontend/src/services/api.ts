@@ -26,11 +26,11 @@ function resolveApiBase(): string {
   const envUrl = import.meta.env.VITE_API_BASE_URL;
   if (typeof envUrl === 'string' && envUrl.trim().length > 0) {
     const trimmed = envUrl.trim();
-    return trimmed.endsWith('/') ? trimmed.slice(0, -1) : trimmed;
+    return trimmed.replace(/\/+$/, '');
   }
 
-  // In local development or local preview, default to local backend on port 8000
-  if (!import.meta.env.PROD) {
+  // Local Vite dev and preview servers use the separate backend on port 8000.
+  if (!import.meta.env.PROD || ['localhost', '127.0.0.1'].includes(window.location.hostname)) {
     return 'http://localhost:8000';
   }
 
@@ -40,6 +40,15 @@ function resolveApiBase(): string {
 
 const API_BASE = resolveApiBase();
 const TOKEN_KEY = 'signbridge_auth_token';
+
+function buildApiUrl(path: string): URL {
+  return new URL(`${API_BASE}${path}`, window.location.origin);
+}
+
+function isKnownStaticHostingDomain(): boolean {
+  const hostname = window.location.hostname.toLowerCase();
+  return ['.vercel.app', '.netlify.app', '.onrender.com'].some((suffix) => hostname.endsWith(suffix));
+}
 
 function getStoredToken(): string | null {
   try {
@@ -86,9 +95,9 @@ async function safeJsonParse(response: Response, endpointDesc: string): Promise<
   const contentType = response.headers.get('content-type') || '';
   if (!response.ok) {
     if (response.status === 404) {
-      if (!API_BASE && (window.location.hostname.includes('vercel.app') || window.location.hostname.includes('netlify.app'))) {
+      if (!API_BASE && isKnownStaticHostingDomain()) {
         throw new Error(
-          `SignBridge backend not configured for this domain (HTTP 404). Please set VITE_API_BASE_URL in your hosting platform dashboard.`
+          'SignBridge backend is not configured for this static deployment. Set VITE_API_BASE_URL to the backend service URL.'
         );
       }
       throw new Error(`API endpoint '${endpointDesc}' not found (HTTP 404).`);
@@ -103,6 +112,11 @@ async function safeJsonParse(response: Response, endpointDesc: string): Promise<
 
   // If response is OK but returned HTML instead of JSON (e.g. SPA fallback on unknown route)
   if (!contentType.includes('application/json') && contentType.includes('text/html')) {
+    if (!API_BASE && isKnownStaticHostingDomain()) {
+      throw new Error(
+        'SignBridge backend is not configured for this static deployment. Set VITE_API_BASE_URL to the backend service URL.'
+      );
+    }
     throw new Error(
       `Received HTML instead of JSON for '${endpointDesc}'. Ensure the backend API server is online and route is mapped.`
     );
@@ -189,7 +203,7 @@ export const api = {
   },
 
   async getHistory(userId?: string, limit = 50): Promise<HistoryResponse> {
-    const url = new URL(`${API_BASE}/history`);
+    const url = buildApiUrl('/history');
     if (userId) url.searchParams.set('user_id', userId);
     url.searchParams.set('limit', String(limit));
 
@@ -222,7 +236,7 @@ export const api = {
   },
 
   async clearHistory(userId?: string): Promise<{ success: boolean; deleted_count: number }> {
-    const url = new URL(`${API_BASE}/history`);
+    const url = buildApiUrl('/history');
     if (userId) url.searchParams.set('user_id', userId);
 
     const res = await fetchWithTimeout(url.toString(), {
@@ -378,7 +392,7 @@ export const api = {
   },
 
   async getQuickPhrases(category?: string, search?: string): Promise<QuickPhraseListResponse> {
-    const url = new URL(`${API_BASE}/translate/phrases`);
+    const url = buildApiUrl('/translate/phrases');
     if (category && category !== 'all') {
       url.searchParams.set('category', category);
     }

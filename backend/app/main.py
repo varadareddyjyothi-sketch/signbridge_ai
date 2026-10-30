@@ -82,7 +82,7 @@ async def custom_http_exception_handler(request: Request, exc: StarletteHTTPExce
 
         index_file = os.path.join(settings.STATIC_DIR, "index.html")
         accept = request.headers.get("accept", "")
-        if request.method == "GET" and os.path.isfile(index_file) and ("text/html" in accept or "*/*" in accept or not accept):
+        if request.method == "GET" and os.path.isfile(index_file) and "text/html" in accept:
             return FileResponse(index_file, headers={"Cache-Control": "no-cache"})
 
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
@@ -168,7 +168,7 @@ async def serve_spa_and_static(request: Request, full_path: str):
     if os.path.isfile(index_file):
         # Only serve index.html for browser-acceptable navigation requests
         accept = request.headers.get("accept", "")
-        if "text/html" in accept or "*/*" in accept or not accept:
+        if "text/html" in accept:
             return FileResponse(index_file, headers={"Cache-Control": "no-cache"})
 
     # 4. If neither physical asset nor SPA build exists, return structured JSON 404

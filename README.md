@@ -295,6 +295,14 @@ If deploying frontend and backend as separate services on DeployXa:
 - **Environment Variables**:
   - `VITE_API_BASE_URL`: `https://your-backend.deployxa.app`
 
+### Static Frontend API Configuration (Render, Vercel, or Netlify)
+
+The Render blueprint in this repository deploys the frontend as a static site and the API as a separate web service. Set the frontend build variable `VITE_API_BASE_URL` to the backend service's HTTPS origin (for example, `https://<your-backend-service>.onrender.com`, without an API path or trailing slash). The Render blueprint declares this variable as a dashboard-supplied value.
+
+Vite embeds this value at build time, so rebuild/redeploy the frontend after setting or changing it. If it is omitted on a separate static frontend, requests such as `/health`, `/auth/login`, and `/history` go to the static frontend host instead of FastAPI. The relative-URL default is intended for unified deployments where FastAPI serves both the frontend and API.
+
+For local development, copy `frontend/.env.example` to `frontend/.env.development`; its localhost URL is for development only and should not be used as a production build variable.
+
 ---
 
 ## 🔒 Post-Deployment Verification & Smoke Tests
@@ -341,5 +349,4 @@ After deploying on DeployXa, verify the live deployment:
 - [ ] Two-handed gesture classification for compound ISL phrases.
 - [ ] User profile customization for personal gesture shortcuts.
 - [ ] Offline PWA deployment with WebAssembly model execution.
-
 

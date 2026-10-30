@@ -21,8 +21,8 @@ interface ParsedRoute {
 
 function parseCurrentRoute(): ParsedRoute {
   // Support both HTML5 path (/recognition) and hash routing (/#recognition or #library)
-  const pathname = window.location.pathname.toLowerCase();
-  const hash = window.location.hash.toLowerCase().replace(/^#\/?/, '');
+  const pathname = window.location.pathname.toLowerCase().replace(/\/+$/, '') || '/';
+  const hash = window.location.hash.toLowerCase().replace(/^#\/?/, '').replace(/\/+$/, '');
 
   const segment = hash || pathname.replace(/^\//, '');
 
@@ -50,7 +50,12 @@ function parseCurrentRoute(): ParsedRoute {
     return { tab: 'home', isNotFound: false, openAuth: false, path: '/' };
   }
 
-  return { tab: 'home', isNotFound: true, openAuth: false, path: window.location.pathname || `/${segment}` };
+  return {
+    tab: 'home',
+    isNotFound: true,
+    openAuth: false,
+    path: window.location.hash || window.location.pathname || `/${segment}`
+  };
 }
 
 export function App() {
@@ -63,7 +68,9 @@ export function App() {
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [isAuthChecking, setIsAuthChecking] = useState<boolean>(() => Boolean(api.getAuthToken()));
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(() => routeState.openAuth);
-  const [authModalInitialMode, setAuthModalInitialMode] = useState<'login' | 'register'>('login');
+  const [authModalInitialMode, setAuthModalInitialMode] = useState<'login' | 'register'>(
+    () => routeState.authMode || 'login'
+  );
   const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
   const [pendingRedirectTab, setPendingRedirectTab] = useState<AppNavTab | null>(null);
 
@@ -96,8 +103,9 @@ export function App() {
     const handleLocationChange = () => {
       const parsed = parseCurrentRoute();
       setRouteState(parsed);
+      setIsAuthModalOpen(parsed.openAuth);
       if (parsed.openAuth) {
-        setIsAuthModalOpen(true);
+        setAuthModalInitialMode(parsed.authMode || 'login');
       }
     };
 
@@ -132,6 +140,7 @@ export function App() {
   useEffect(() => {
     if (!isAuthChecking && !currentUser && activeTab !== 'home' && !isNotFound) {
       setPendingRedirectTab(activeTab);
+      setAuthModalInitialMode('login');
       navigate('home');
       setIsAuthModalOpen(true);
     }
@@ -200,7 +209,7 @@ export function App() {
   const handleAuthSuccess = (user: UserProfile) => {
     setCurrentUser(user);
     setIsAuthModalOpen(false);
-    const destination = pendingRedirectTab || 'recognition';
+    const destination = pendingRedirectTab || 'home';
     setPendingRedirectTab(null);
     navigate(destination);
   };
@@ -361,4 +370,3 @@ export function App() {
 }
 
 export default App;
-
