@@ -22,7 +22,6 @@ If you have a MongoDB Atlas account (Project: `69ba6bd5b08f2ff79b9aa170`):
    ```env
    MONGODB_URI=mongodb+srv://<username>:<password>@cluster0.mongodb.net/signbridge_ai?retryWrites=true&w=majority
    MONGODB_DB_NAME=signbridge_ai
-   JWT_SECRET=your_secure_jwt_secret_key_here
    ```
 7. Start or restart the backend:
    ```powershell
@@ -31,7 +30,7 @@ If you have a MongoDB Atlas account (Project: `69ba6bd5b08f2ff79b9aa170`):
    The backend will automatically initialize the necessary collections and indexes:
    - `users` (unique on `email`, `id`)
    - `profiles` (unique on `id`, `email`)
-   - `auth_sessions` (unique on `token`, indexed on `user_id`, `expires_at`)
+   - `auth_sessions` (hashed session tokens, indexed on `user_id`, `expires_at`)
    - `recognition_history` (unique on `id`, indexed on `user_id`, `created_at`)
    - `sentence_history` (unique on `id`, indexed on `user_id`, `created_at`)
 
@@ -58,8 +57,10 @@ If you have existing historical data in local SQLite that you want copied into M
 
 ## 3. Local SQLite Fallback
 
-If you don't have MongoDB Atlas credentials or are developing offline:
+For local development only, if MongoDB is not configured:
 - Leave `MONGODB_URI` empty in `.env`.
 - SignBridge AI will automatically initialize and write records to `backend/app/database/signbridge_local.db`.
 - The dashboard will display `Storage: SQLite Local` in the navigation bar.
 - No external services, Docker, or external database setup is required.
+
+Production requires a reachable MongoDB URI and an exact `ALLOWED_ORIGINS` entry for the frontend. A configured but unavailable database returns HTTP 503; production data is never silently written to SQLite.

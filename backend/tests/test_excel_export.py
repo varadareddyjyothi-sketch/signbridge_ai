@@ -1,18 +1,28 @@
-"""
-Backend API Tests - Excel Export & Formula Injection Prevention
-"""
+"""Backend API tests for Excel export and formula injection prevention."""
 
 import io
-import pytest
 import uuid
+
+import mongomock
 import openpyxl
-from httpx import AsyncClient, ASGITransport
+import pytest
+from httpx import ASGITransport, AsyncClient
+
+from backend.app.database.mongo_client import set_mock_mongo_db
 from backend.app.main import app
 from backend.app.services.excel_export_service import sanitize_excel_value
 
 
+@pytest.fixture(autouse=True)
+def isolated_mongo():
+    client = mongomock.MongoClient()
+    set_mock_mongo_db(client["signbridge_ai"])
+    yield
+    set_mock_mongo_db(None)
+    client.close()
+
+
 def test_formula_injection_sanitization():
-    """Verify that potentially hazardous formula injection prefixes are safely escaped with a single quote."""
     assert sanitize_excel_value("=1+1") == "'=1+1"
     assert sanitize_excel_value("+cmd|'/c calc'!A1") == "'+cmd|'/c calc'!A1"
     assert sanitize_excel_value("-5*10") == "'-5*10"
@@ -26,62 +36,56 @@ def test_formula_injection_sanitization():
 @pytest.mark.anyio
 async def test_excel_export_endpoints():
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        email = f"excel_user_{uuid.uuid4().hex[:8]}@example.com"
-        res_reg = await ac.post("/auth/register", json={
-            "email": email,
-            "password": "Password123!",
-            "display_name": "Excel Tester",
-            "preferred_language": "te"
-        })
-        token = res_reg.json()["token"]
-        headers = {"Authorization": f"Bearer {token}"}
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        email = f"excel_user_{uuid.uuid4().hex}@example.com"
+        registration = await client.post(
+            "/auth/register",
+            json={
+                "email": email,
+                "password": "Password123!",
+                "display_name": "Excel Tester",
+                "preferred_language": "te",
+            },
+        )
+        assert registration.status_code == 200
 
-        # 1. Test empty export
-        res_export_empty = await ac.get("/history/export/excel", headers=headers)
-        assert res_export_empty.status_code == 200
-        assert "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" in res_export_empty.headers.get("content-type", "")
-        
-        # Parse workbook
-        wb_empty = openpyxl.load_workbook(filename=io.BytesIO(res_export_empty.content))
-        assert "User Profile" in wb_empty.sheetnames
-        assert "Sentence History" in wb_empty.sheetnames
-        assert "Export Information" in wb_empty.sheetnames
-
-        # Check export info sheet
-        sheet_info = wb_empty["Export Information"]
-        info_rows = list(sheet_info.iter_rows(values_only=True))
+        export_empty = await client.get("/history/export/excel")
+        assert export_empty.status_code == 200
+        assert "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" in (
+            export_empty.headers.get("content-type", "")
+        )
+        workbook_empty = openpyxl.load_workbook(io.BytesIO(export_empty.content))
+        assert {"User Profile", "Sentence History", "Export Information"}.issubset(
+            workbook_empty.sheetnames
+        )
+        info_rows = list(workbook_empty["Export Information"].iter_rows(values_only=True))
         assert any("Total Sentence Records" in str(row[0]) for row in info_rows)
 
-        # 2. Add a sentence with formula-like text to test injection protection in output
         malicious_input = "=cmd|' /C calc'!A0"
-        sentence_payload = {
-            "original_signs": ["YES", "HELLO"],
-            "confirmed_sentence": malicious_input,
-            "english_output": "Formula Test",
-            "telugu_output": "సూత్ర పరీక్ష",
-            "romanized_telugu": "Soothra Pareeksha",
-            "selected_language": "te",
-            "recognition_mode": "sentence_builder"
-        }
-        res_save = await ac.post("/history/sentence", json=sentence_payload, headers=headers)
-        assert res_save.status_code == 200
+        save_response = await client.post(
+            "/history/sentence",
+            json={
+                "original_signs": ["YES", "HELLO"],
+                "confirmed_sentence": malicious_input,
+                "english_output": "Formula Test",
+                "telugu_output": "సూత్ర పరీక్ష",
+                "romanized_telugu": "Soothra Pareeksha",
+                "selected_language": "te",
+                "recognition_mode": "sentence_builder",
+            },
+        )
+        assert save_response.status_code == 200
 
-        # 3. Export again and inspect sentence sheet
-        res_export = await ac.get("/history/export/excel", headers=headers)
-        assert res_export.status_code == 200
-        wb = openpyxl.load_workbook(filename=io.BytesIO(res_export.content))
-        
-        sentence_sheet = wb["Sentence History"]
-        rows = list(sentence_sheet.iter_rows(values_only=True))
-        
-        # Find the header row containing "Record ID"
-        header_row_idx = next(i for i, r in enumerate(rows) if r and "Record ID" in r)
-        headers_row = rows[header_row_idx]
-        assert "Confirmed Sentence" in headers_row
-
-        # Check that the formula text is escaped safely with leading single quote
-        data_rows = rows[header_row_idx + 1:]
-        confirmed_col_idx = headers_row.index("Confirmed Sentence")
-        confirmed_vals = [r[confirmed_col_idx] for r in data_rows if r and r[confirmed_col_idx] is not None]
-        assert f"'{malicious_input}" in confirmed_vals
+        export_response = await client.get("/history/export/excel")
+        assert export_response.status_code == 200
+        workbook = openpyxl.load_workbook(io.BytesIO(export_response.content))
+        rows = list(workbook["Sentence History"].iter_rows(values_only=True))
+        header_index = next(i for i, row in enumerate(rows) if row and "Record ID" in row)
+        headers = rows[header_index]
+        assert "Confirmed Sentence" in headers
+        values = [
+            row[headers.index("Confirmed Sentence")]
+            for row in rows[header_index + 1:]
+            if row and row[headers.index("Confirmed Sentence")] is not None
+        ]
+        assert f"'{malicious_input}" in values

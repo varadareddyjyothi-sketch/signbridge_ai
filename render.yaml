@@ -13,8 +13,10 @@ services:
         value: 8000
       - key: MONGODB_URI
         sync: false
-      - key: JWT_SECRET
-        generateValue: true
+      - key: MONGODB_DB_NAME
+        value: signbridge_ai
+      - key: ALLOWED_ORIGINS
+        sync: false
 
   - type: web
     name: signbridge-ai-frontend

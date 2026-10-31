@@ -180,7 +180,7 @@ export interface UserProfile {
 }
 
 export interface AuthResponse {
-  token: string;
+  token?: string;
   user: UserProfile;
   message: string;
 }
@@ -206,6 +206,5 @@ export interface SentenceHistoryResponse {
   storage_mode: 'mongodb' | 'local_sqlite' | string;
   cloud_connected: boolean;
 }
-
 
 

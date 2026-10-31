@@ -45,7 +45,7 @@ def test_mongo_client_status_and_indexes(setup_mock_mongo):
 
 
 def test_mongodb_user_auth_and_profiles(setup_mock_mongo):
-    """Test user registration, PBKDF2 hashing, login verification, and profile updates in MongoDB."""
+    """Test bcrypt password storage, login verification, sessions, and profiles."""
     email = "mongo_tester@example.com"
     raw_password = "SecurePassword123!"
 
@@ -62,11 +62,11 @@ def test_mongodb_user_auth_and_profiles(setup_mock_mongo):
     assert "id" in created
     user_id = created["id"]
 
-    # Password hash must not be raw password and must be 64-char PBKDF2 hex
+    # Passwords are stored as bcrypt hashes and never as clear text.
     user_doc = setup_mock_mongo.users.find_one({"email": email})
     assert user_doc is not None
     assert user_doc["password_hash"] != raw_password
-    assert len(user_doc["password_hash"]) == 64
+    assert user_doc["password_hash"].startswith(("$2a$", "$2b$", "$2y$"))
 
     # Duplicate registration should raise ValueError
     with pytest.raises(ValueError):
@@ -81,6 +81,10 @@ def test_mongodb_user_auth_and_profiles(setup_mock_mongo):
     assert auth_ok is not None
     assert auth_ok["user"]["id"] == user_id
     token = auth_ok["token"]
+    session_doc = setup_mock_mongo.auth_sessions.find_one({"user_id": user_id})
+    assert session_doc is not None
+    assert session_doc["token"] != token
+    assert len(session_doc["token"]) == 64
 
     auth_bad = history_service.authenticate_user(email, "WrongPassword!")
     assert auth_bad is None
@@ -263,8 +267,8 @@ async def test_full_api_auth_and_history_in_mongo_mode(setup_mock_mongo):
         res_reg = await ac.post("/auth/register", json=reg_payload)
         assert res_reg.status_code == 200
         reg_data = res_reg.json()
-        assert "token" in reg_data
-        token = reg_data["token"]
+        assert "token" not in reg_data
+        token = res_reg.cookies.get("signbridge_session")
         headers = {"Authorization": f"Bearer {token}"}
 
         # 3. Check /auth/me

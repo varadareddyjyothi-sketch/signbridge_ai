@@ -223,7 +223,7 @@ async def test_sentence_history_and_excel_export_with_source_mode():
             "display_name": "Mode Tester",
             "preferred_language": "en"
         })
-        token = res_reg.json()["token"]
+        token = res_reg.cookies.get("signbridge_session")
         headers = {"Authorization": f"Bearer {token}"}
 
         # 1. Save sentence from Mode 1 (Camera Recognition)
@@ -285,7 +285,7 @@ async def test_duplicate_sentence_suppression_and_single_deletion():
             "display_name": "Deduplication Tester",
             "preferred_language": "en"
         })
-        token = res_reg.json()["token"]
+        token = res_reg.cookies.get("signbridge_session")
         headers = {"Authorization": f"Bearer {token}"}
 
         # 1. Post identical sentence twice rapidly
@@ -318,4 +318,3 @@ async def test_duplicate_sentence_suppression_and_single_deletion():
         res_hist_after = await ac.get("/history/sentences", headers=headers)
         items_after = res_hist_after.json().get("items", [])
         assert not any(i["id"] == record_id for i in items_after)
-

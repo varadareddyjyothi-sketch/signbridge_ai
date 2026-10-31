@@ -56,6 +56,19 @@ class TwoHandPredictionRequest(BaseModel):
     )
 
 
+class TemporalFrame(BaseModel):
+    landmarks: List[LandmarkPoint] = Field(..., description="21 landmarks for this frame")
+    timestamp: Optional[float] = Field(None, description="Timestamp in seconds or ms")
+    handedness: Optional[str] = Field("Right", description="'Left' or 'Right'")
+
+
+class SequencePredictionRequest(BaseModel):
+    frames: List[TemporalFrame] = Field(..., description="Sequence of landmark frames across time")
+    handedness: Optional[str] = Field("Right", description="'Left' or 'Right'")
+    confidence_threshold: Optional[float] = Field(None, ge=0.0, le=1.0)
+    mode: Optional[str] = Field("general", description="'general' | 'numerical' | 'isl'")
+
+
 class PredictionResponse(BaseModel):
     detected: bool = Field(..., description="Whether a hand was present and valid")
     label: Optional[str] = Field(None, description="Predicted sign class label (e.g., 'ISL_1' or 'ISL_NAMASTE_2HAND')")
@@ -68,10 +81,17 @@ class PredictionResponse(BaseModel):
         ...,
         description="'accepted' | 'uncertain_rejected' | 'no_hand' | 'model_unavailable' | 'error'"
     )
+    state: Optional[str] = Field(
+        None,
+        description="'waiting_hand' | 'hand_detected' | 'analyzing_gesture' | 'recognizing_movement' | 'gesture_recognized' | 'low_confidence' | 'unknown_gesture'"
+    )
     is_verified_isl: bool = Field(False, description="Whether this label is verified in ISL vocabulary")
     gesture_type: Optional[str] = Field("static", description="'static' | 'dynamic' | 'verified_isl' | 'two_hand_isl' | 'general_gesture'")
     hands_detected: int = Field(1, description="Number of hands detected for this sign (1 or 2)")
     model_version: Optional[str] = Field("v1.0.0", description="Active model version")
+    motion: Optional[Dict[str, Any]] = Field(None, description="Dynamic trajectory and motion analysis")
+    anatomy: Optional[Dict[str, Any]] = Field(None, description="Biomechanical hand anatomy and orientation")
+    disambiguation_note: Optional[str] = Field(None, description="Reasoning applied to disambiguate visually similar gestures")
     all_probabilities: Optional[Dict[str, float]] = Field(
         None,
         description="Class probability breakdown from the classifier"

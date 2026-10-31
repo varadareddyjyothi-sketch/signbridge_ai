@@ -6,8 +6,10 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from backend.app.config import settings
-from backend.app.api import health, predict, history, dataset, vocabulary, models, sentence, auth
+from backend.app.api import health, predict, history, dataset, vocabulary, models, sentence, auth, gesture
 from backend.app.database.local_storage import init_local_db
+from backend.app.database.history_service import DatabaseUnavailableError
+from backend.app.database.mongo_client import close_mongo_connection
 
 
 @asynccontextmanager
@@ -15,8 +17,10 @@ async def lifespan(app: FastAPI):
     # Startup actions
     init_local_db()
     print(f"[{settings.APP_NAME}] Startup complete. Server listening on {settings.HOST}:{settings.PORT}")
-    yield
-    # Shutdown actions if needed
+    try:
+        yield
+    finally:
+        close_mongo_connection()
 
 
 app = FastAPI(
@@ -32,11 +36,14 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
-    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.exception_handler(DatabaseUnavailableError)
+async def database_unavailable_handler(request: Request, exc: DatabaseUnavailableError):
+    return JSONResponse(status_code=503, content={"detail": str(exc)})
 
 # Include Routers
 app.include_router(auth.router)
@@ -47,6 +54,10 @@ app.include_router(dataset.router)
 app.include_router(vocabulary.router)
 app.include_router(models.router)
 app.include_router(sentence.router)
+app.include_router(gesture.router)
+
+# Aliases for /api routes
+app.include_router(dataset.router, prefix="/api")
 
 
 # API Route Prefixes that must NEVER return HTML or SPA fallbacks
@@ -58,6 +69,7 @@ API_ROUTE_PREFIXES = (
     "/auth",
     "/predict",
     "/history",
+    "/model",
     "/models",
     "/dataset",
     "/vocabulary",
@@ -166,7 +178,7 @@ async def serve_spa_and_static(request: Request, full_path: str):
     # 3. Check for index.html for SPA client-side routing fallback (e.g. /recognition, /history, /guide)
     index_file = os.path.join(settings.STATIC_DIR, "index.html")
     if os.path.isfile(index_file):
-        # Only serve index.html for browser-acceptable navigation requests
+        # Only serve index.html for browser document navigations, not missing assets.
         accept = request.headers.get("accept", "")
         if "text/html" in accept:
             return FileResponse(index_file, headers={"Cache-Control": "no-cache"})
@@ -185,5 +197,3 @@ async def serve_spa_and_static(request: Request, full_path: str):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("backend.app.main:app", host=settings.HOST, port=settings.PORT, reload=settings.DEBUG)
-
-

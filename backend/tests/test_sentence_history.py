@@ -20,7 +20,7 @@ async def test_sentence_history_and_isolation():
             "display_name": "User Alpha",
             "preferred_language": "en"
         })
-        token_a = res_a.json()["token"]
+        token_a = res_a.cookies.get("signbridge_session")
         headers_a = {"Authorization": f"Bearer {token_a}"}
 
         # Create User B
@@ -31,7 +31,7 @@ async def test_sentence_history_and_isolation():
             "display_name": "User Beta",
             "preferred_language": "te"
         })
-        token_b = res_b.json()["token"]
+        token_b = res_b.cookies.get("signbridge_session")
         headers_b = {"Authorization": f"Bearer {token_b}"}
 
         # User A saves a sentence
@@ -83,14 +83,14 @@ async def test_single_sentence_delete_and_security():
         res_1 = await ac.post("/auth/register", json={
             "email": email_1, "password": "Password123!", "display_name": "S1", "preferred_language": "en"
         })
-        token_1 = res_1.json()["token"]
+        token_1 = res_1.cookies.get("signbridge_session")
         headers_1 = {"Authorization": f"Bearer {token_1}"}
 
         email_2 = f"s2_{uuid.uuid4().hex[:8]}@example.com"
         res_2 = await ac.post("/auth/register", json={
             "email": email_2, "password": "Password123!", "display_name": "S2", "preferred_language": "en"
         })
-        token_2 = res_2.json()["token"]
+        token_2 = res_2.cookies.get("signbridge_session")
         headers_2 = {"Authorization": f"Bearer {token_2}"}
 
         # User 1 creates sentence

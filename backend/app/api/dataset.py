@@ -47,6 +47,7 @@ async def get_dataset_stats():
 
 
 @router.post("/sample")
+@router.post("/collect")
 async def save_dataset_sample(sample: DatasetSampleRequest):
     """Appends a valid 63-dimensional normalized feature vector to the dataset CSV."""
     if len(sample.features) != FEATURE_DIMENSION:
@@ -119,6 +120,7 @@ async def export_dataset():
 
 
 @router.get("/validate")
+@router.post("/validate")
 async def validate_dataset():
     """Validates the dataset structure, features dimension, class distribution, and balance."""
     path = settings.DATASET_PATH

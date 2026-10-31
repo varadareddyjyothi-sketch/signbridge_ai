@@ -5,7 +5,9 @@ Creates required collections and unique indexes.
 Provides graceful error handling and disconnection recovery.
 """
 
-from typing import Optional, Dict, Any
+import logging
+import threading
+from typing import Optional, Any
 import time
 
 try:
@@ -25,50 +27,41 @@ except ImportError:
 
 from backend.app.config import settings
 
+logger = logging.getLogger(__name__)
 _mongo_client: Optional[Any] = None
 _mongo_db: Optional[Any] = None
-_is_connected: bool = False
 _last_connect_failure_time: float = 0.0
-_CONNECT_RETRY_INTERVAL_SECONDS: float = 30.0
+_CONNECT_RETRY_INTERVAL_SECONDS: float = 5.0
+_MONGO_LOCK = threading.Lock()
 
 
 def init_mongo_indexes(db: Any) -> None:
     """Ensures necessary indexes and constraints are created in MongoDB collections."""
     if not PYMONGO_AVAILABLE or db is None:
         return
-    try:
-        # Users collection indexes: unique email and user ID
-        db.users.create_index([("email", ASCENDING)], unique=True)
-        db.users.create_index([("id", ASCENDING)], unique=True)
-        db.users.create_index([("created_at", DESCENDING)])
+    db.users.create_index([("email", ASCENDING)], unique=True)
+    db.users.create_index([("id", ASCENDING)], unique=True)
+    db.users.create_index([("created_at", DESCENDING)])
 
-        # Auth Sessions collection indexes: token lookup & auto-expiry index
-        db.auth_sessions.create_index([("token", ASCENDING)], unique=True)
-        db.auth_sessions.create_index([("user_id", ASCENDING)])
-        db.auth_sessions.create_index([("expires_at", ASCENDING)])
+    db.auth_sessions.create_index([("token", ASCENDING)], unique=True)
+    db.auth_sessions.create_index([("user_id", ASCENDING)])
+    db.auth_sessions.create_index([("expires_at", ASCENDING)])
 
-        # Profiles collection indexes
-        db.profiles.create_index([("id", ASCENDING)], unique=True)
-        db.profiles.create_index([("email", ASCENDING)], unique=True)
+    db.profiles.create_index([("id", ASCENDING)], unique=True)
+    db.profiles.create_index([("email", ASCENDING)], unique=True)
 
-        # Recognition History collection indexes: user_id & creation timestamp
-        db.recognition_history.create_index([("id", ASCENDING)], unique=True)
-        db.recognition_history.create_index([("user_id", ASCENDING)])
-        db.recognition_history.create_index([("created_at", DESCENDING)])
+    db.recognition_history.create_index([("id", ASCENDING)], unique=True)
+    db.recognition_history.create_index([("user_id", ASCENDING)])
+    db.recognition_history.create_index([("created_at", DESCENDING)])
 
-        # Sentence History collection indexes: user_id & creation timestamp
-        db.sentence_history.create_index([("id", ASCENDING)], unique=True)
-        db.sentence_history.create_index([("user_id", ASCENDING)])
-        db.sentence_history.create_index([("created_at", DESCENDING)])
-
-        print("[MongoDB] Collections and indexes initialized successfully.")
-    except Exception as e:
-        print(f"[MongoDB] Index creation warning: {e}")
+    db.sentence_history.create_index([("id", ASCENDING)], unique=True)
+    db.sentence_history.create_index([("user_id", ASCENDING)])
+    db.sentence_history.create_index([("created_at", DESCENDING)])
 
 
 def get_mongo_client() -> Optional[Any]:
     """Retrieves or initializes the singleton PyMongo client with retry cooldown."""
-    global _mongo_client, _mongo_db, _is_connected, _last_connect_failure_time
+    global _mongo_client, _mongo_db, _last_connect_failure_time
 
     if not PYMONGO_AVAILABLE:
         return None
@@ -76,45 +69,41 @@ def get_mongo_client() -> Optional[Any]:
     if _mongo_client is not None:
         return _mongo_client
 
-    # If recent connection attempt failed, don't block subsequent requests during cooldown
-    now = time.time()
-    if now - _last_connect_failure_time < _CONNECT_RETRY_INTERVAL_SECONDS:
-        return None
-
     uri = (settings.MONGODB_URI or "").strip()
     if not uri or not (uri.startswith("mongodb://") or uri.startswith("mongodb+srv://")):
         return None
 
-    try:
-        # Connect with server selection timeout for resilient startup
-        _mongo_client = MongoClient(
-            uri,
-            serverSelectionTimeoutMS=3000,
-            connectTimeoutMS=3000,
-            socketTimeoutMS=3000,
-            maxPoolSize=50,
-            retryWrites=True
-        )
-        # Test connection ping
-        _mongo_client.admin.command('ping')
-        _is_connected = True
-        _last_connect_failure_time = 0.0
+    with _MONGO_LOCK:
+        if _mongo_client is not None:
+            return _mongo_client
+        if time.monotonic() - _last_connect_failure_time < _CONNECT_RETRY_INTERVAL_SECONDS:
+            return None
 
-        db_name = settings.MONGODB_DB_NAME or "signbridge_ai"
-        _mongo_db = _mongo_client[db_name]
-        init_mongo_indexes(_mongo_db)
-        print(f"[MongoDB] Successfully connected to MongoDB Atlas database: '{db_name}'.")
-        return _mongo_client
-    except (ConnectionFailure, ServerSelectionTimeoutError, Exception) as e:
-        _last_connect_failure_time = time.time()
-        print(f"[MongoDB] Connection to MongoDB failed ({e}). Operating in resilient fallback mode.")
-        _mongo_client = None
-        _mongo_db = None
-        _is_connected = False
-        return None
-
-
-
+        client = None
+        try:
+            client = MongoClient(
+                uri,
+                serverSelectionTimeoutMS=3000,
+                connectTimeoutMS=3000,
+                socketTimeoutMS=3000,
+                retryWrites=True
+            )
+            client.admin.command("ping")
+            db_name = settings.MONGODB_DB_NAME or "signbridge_ai"
+            db = client[db_name]
+            init_mongo_indexes(db)
+            _mongo_client = client
+            _mongo_db = db
+            _last_connect_failure_time = 0.0
+            logger.info("Connected to MongoDB database %s", db_name)
+            return _mongo_client
+        except Exception as exc:
+            if client is not None:
+                client.close()
+            _last_connect_failure_time = time.monotonic()
+            _mongo_db = None
+            logger.error("MongoDB connection or index initialization failed: %s", type(exc).__name__)
+            return None
 def get_mongo_db() -> Optional[Database]:
     """Retrieves the active MongoDB database instance, or None if disconnected."""
     global _mongo_db
@@ -123,8 +112,6 @@ def get_mongo_db() -> Optional[Database]:
 
     client = get_mongo_client()
     if client is not None:
-        db_name = settings.MONGODB_DB_NAME or "signbridge_ai"
-        _mongo_db = client[db_name]
         return _mongo_db
     return None
 
@@ -144,10 +131,7 @@ def is_mongo_connected() -> bool:
     if db is None:
         return False
     try:
-        try:
-            db.command('ping')
-        except Exception:
-            db.list_collection_names()
+        db.command("ping")
         return True
     except Exception:
         return False
@@ -155,21 +139,19 @@ def is_mongo_connected() -> bool:
 
 def set_mock_mongo_db(mock_db: Optional[Database]) -> None:
     """Testing helper: sets a mock MongoDB database instance (e.g. from mongomock)."""
-    global _mongo_client, _mongo_db, _is_connected
+    global _mongo_client, _mongo_db, _last_connect_failure_time
     _mongo_db = mock_db
-    _is_connected = mock_db is not None
+    _mongo_client = getattr(mock_db, "client", mock_db) if mock_db is not None else None
+    _last_connect_failure_time = 0.0
     if mock_db is not None:
         init_mongo_indexes(mock_db)
 
 
 def close_mongo_connection() -> None:
     """Safely closes the MongoDB connection pool."""
-    global _mongo_client, _mongo_db, _is_connected
-    if _mongo_client is not None:
-        try:
+    global _mongo_client, _mongo_db
+    with _MONGO_LOCK:
+        if _mongo_client is not None:
             _mongo_client.close()
-        except Exception:
-            pass
-    _mongo_client = None
-    _mongo_db = None
-    _is_connected = False
+        _mongo_client = None
+        _mongo_db = None

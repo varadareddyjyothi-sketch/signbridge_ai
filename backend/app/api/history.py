@@ -4,9 +4,8 @@ Includes genuine Excel (.xlsx) export with formula sanitization.
 """
 
 import os
-from typing import Optional
 from datetime import datetime, timezone
-from fastapi import APIRouter, Query, Header, HTTPException, Depends, Request
+from fastapi import APIRouter, Query, HTTPException, Depends, Request
 from fastapi.responses import StreamingResponse, FileResponse
 from backend.app.config import settings
 from backend.app.schemas.history import (
@@ -18,9 +17,8 @@ from backend.app.schemas.history import (
     SentenceHistoryEntry
 )
 from backend.app.database.history_service import history_service
-from backend.app.database.local_storage import get_user_by_id, get_user_by_token
 from backend.app.services.excel_export_service import excel_export_service
-from backend.app.api.auth import get_current_user_optional
+from backend.app.api.auth import get_current_user_required
 
 router = APIRouter(prefix="/history", tags=["History & Export"])
 
@@ -30,19 +28,19 @@ router = APIRouter(prefix="/history", tags=["History & Export"])
 # =========================================================================
 
 @router.get("", response_model=HistoryResponse)
-async def get_history(
+def get_history(
     request: Request,
     limit: int = Query(50, ge=1, le=200, description="Max records to retrieve"),
-    current_user: Optional[dict] = Depends(get_current_user_optional)
+    current_user: dict = Depends(get_current_user_required)
 ):
-    """Retrieves sign recognition history for the current user or guest, or serves SPA index.html for browser navigation."""
+    """Retrieves only the authenticated user's recognition history."""
     accept = request.headers.get("accept", "")
     index_path = os.path.join(settings.STATIC_DIR, "index.html")
     # If visited from a browser address bar (Accept text/html and not JSON-first)
     if "text/html" in accept and "application/json" not in accept and os.path.isfile(index_path):
         return FileResponse(index_path, headers={"Cache-Control": "no-cache"})
 
-    effective_user_id = current_user["id"] if current_user else None
+    effective_user_id = current_user["id"]
     items = history_service.get_history(user_id=effective_user_id, limit=limit)
     return HistoryResponse(
         items=[HistoryEntry(**item) for item in items],
@@ -54,12 +52,12 @@ async def get_history(
 
 
 @router.post("", response_model=HistoryEntry)
-async def save_history(
+def save_history(
     entry: HistoryCreateRequest,
-    current_user: Optional[dict] = Depends(get_current_user_optional)
+    current_user: dict = Depends(get_current_user_required)
 ):
     """Saves a genuine recognition prediction result with authenticated user isolation."""
-    effective_user_id = current_user["id"] if current_user else None
+    effective_user_id = current_user["id"]
     result = history_service.add_entry(
         predicted_label=entry.predicted_label,
         english_meaning=entry.english_meaning,
@@ -71,11 +69,11 @@ async def save_history(
 
 
 @router.delete("")
-async def clear_history(
-    current_user: Optional[dict] = Depends(get_current_user_optional)
+def clear_history(
+    current_user: dict = Depends(get_current_user_required)
 ):
-    """Clears permitted recognition history records for the authenticated user or guest."""
-    effective_user_id = current_user["id"] if current_user else None
+    """Clears only the authenticated user's recognition history."""
+    effective_user_id = current_user["id"]
     deleted_count = history_service.clear_history(user_id=effective_user_id)
     return {
         "success": True,
@@ -93,12 +91,12 @@ async def clear_history(
 
 @router.get("/sentence", response_model=SentenceHistoryResponse)
 @router.get("/sentences", response_model=SentenceHistoryResponse)
-async def get_sentence_history(
+def get_sentence_history(
     limit: int = Query(100, ge=1, le=500, description="Max records to retrieve"),
-    current_user: Optional[dict] = Depends(get_current_user_optional)
+    current_user: dict = Depends(get_current_user_required)
 ):
-    """Retrieves confirmed human-approved sentences for the authenticated user or guest."""
-    effective_user_id = current_user["id"] if current_user else None
+    """Retrieves only the authenticated user's confirmed sentences."""
+    effective_user_id = current_user["id"]
     items = history_service.get_sentence_history(user_id=effective_user_id, limit=limit)
     return SentenceHistoryResponse(
         items=[SentenceHistoryEntry(**item) for item in items],
@@ -109,12 +107,12 @@ async def get_sentence_history(
 
 
 @router.post("/sentence", response_model=SentenceHistoryEntry)
-async def save_sentence_history(
+def save_sentence_history(
     entry: SentenceHistoryCreateRequest,
-    current_user: Optional[dict] = Depends(get_current_user_optional)
+    current_user: dict = Depends(get_current_user_required)
 ):
     """Saves an explicitly confirmed sentence to persistent history with user isolation."""
-    effective_user_id = current_user["id"] if current_user else None
+    effective_user_id = current_user["id"]
     result = history_service.add_sentence_entry(
         original_signs=entry.original_signs,
         confirmed_sentence=entry.confirmed_sentence,
@@ -130,11 +128,11 @@ async def save_sentence_history(
 
 
 @router.delete("/sentence")
-async def clear_sentence_history(
-    current_user: Optional[dict] = Depends(get_current_user_optional)
+def clear_sentence_history(
+    current_user: dict = Depends(get_current_user_required)
 ):
-    """Clears confirmed sentence records for the current user or guest session."""
-    effective_user_id = current_user["id"] if current_user else None
+    """Clears only the authenticated user's confirmed sentences."""
+    effective_user_id = current_user["id"]
     deleted_count = history_service.clear_sentence_history(user_id=effective_user_id)
     return {
         "success": True,
@@ -144,15 +142,17 @@ async def clear_sentence_history(
 
 
 @router.delete("/sentence/{record_id}")
-async def delete_single_sentence(
+def delete_single_sentence(
     record_id: str,
-    current_user: Optional[dict] = Depends(get_current_user_optional)
+    current_user: dict = Depends(get_current_user_required)
 ):
-    """Deletes an individual confirmed sentence record owned by the user or guest."""
-    effective_user_id = current_user["id"] if current_user else None
+    """Deletes an individual confirmed sentence record owned by the user."""
+    effective_user_id = current_user["id"]
     deleted = history_service.delete_sentence_by_id(record_id=record_id, user_id=effective_user_id)
     if not deleted:
-        raise HTTPException(status_code=404, detail="Sentence record not found or unauthorized to delete")
+        if history_service.sentence_exists_any(record_id=record_id):
+            raise HTTPException(status_code=403, detail="You do not have permission to delete this sentence record")
+        raise HTTPException(status_code=404, detail="Sentence record not found")
     return {
         "success": True,
         "deleted_id": record_id,
@@ -165,8 +165,8 @@ async def delete_single_sentence(
 # =========================================================================
 
 @router.get("/export/excel")
-async def export_excel(
-    current_user: Optional[dict] = Depends(get_current_user_optional)
+def export_excel(
+    current_user: dict = Depends(get_current_user_required)
 ):
     """
     Generates and downloads a genuine multi-sheet Excel (.xlsx) workbook containing:
@@ -176,7 +176,7 @@ async def export_excel(
     Includes formula injection sanitization and authenticated user isolation.
     """
     effective_user = current_user
-    effective_user_id = effective_user["id"] if effective_user else None
+    effective_user_id = effective_user["id"]
     sentences = history_service.get_sentence_history(user_id=effective_user_id, limit=500)
     storage_source = "MongoDB Atlas" if history_service.is_cloud_connected() else "Local SQLite"
 
@@ -204,15 +204,17 @@ async def export_excel(
 # =========================================================================
 
 @router.delete("/{record_id}")
-async def delete_single_history(
+def delete_single_history(
     record_id: str,
-    current_user: Optional[dict] = Depends(get_current_user_optional)
+    current_user: dict = Depends(get_current_user_required)
 ):
-    """Deletes an individual recognition history record owned by the user or guest."""
-    effective_user_id = current_user["id"] if current_user else None
+    """Deletes an individual recognition history record owned by the user."""
+    effective_user_id = current_user["id"]
     deleted = history_service.delete_entry_by_id(record_id=record_id, user_id=effective_user_id)
     if not deleted:
-        raise HTTPException(status_code=404, detail="Recognition record not found or unauthorized to delete")
+        if history_service.entry_exists_any(record_id=record_id):
+            raise HTTPException(status_code=403, detail="You do not have permission to delete this recognition record")
+        raise HTTPException(status_code=404, detail="Recognition record not found")
     return {
         "success": True,
         "deleted_id": record_id,

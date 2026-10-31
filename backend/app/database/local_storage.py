@@ -9,6 +9,7 @@ import sqlite3
 import uuid
 import hashlib
 import secrets
+import bcrypt
 from typing import List, Dict, Optional, Any, Tuple
 from datetime import datetime, timezone, timedelta
 from backend.app.config import settings
@@ -22,21 +23,31 @@ def get_db_connection() -> sqlite3.Connection:
 
 
 def _hash_password(password: str, salt: Optional[str] = None) -> Tuple[str, str]:
-    """Hashes a password with PBKDF2-HMAC-SHA256 and salt."""
-    if not salt:
-        salt = secrets.token_hex(16)
-    hashed = hashlib.pbkdf2_hmac(
+    """Hashes new passwords with bcrypt; the salt column remains for legacy hashes."""
+    hashed = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt(rounds=12))
+    return hashed.decode("ascii"), ""
+
+
+def _verify_password(password: str, hashed: str, salt: str) -> bool:
+    if hashed.startswith(("$2a$", "$2b$", "$2y$")):
+        try:
+            return bcrypt.checkpw(password.encode("utf-8"), hashed.encode("ascii"))
+        except (ValueError, TypeError):
+            return False
+
+    # Existing accounts use PBKDF2-HMAC-SHA256 and are upgraded after login.
+    new_hash = hashlib.pbkdf2_hmac(
         "sha256",
         password.encode("utf-8"),
         salt.encode("utf-8"),
         100000
     ).hex()
-    return hashed, salt
-
-
-def _verify_password(password: str, hashed: str, salt: str) -> bool:
-    new_hash, _ = _hash_password(password, salt)
     return secrets.compare_digest(new_hash, hashed)
+
+
+def hash_session_token(token: str) -> str:
+    """Hashes a bearer secret before it is persisted."""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
 def init_local_db():
@@ -163,10 +174,13 @@ def create_user(
         if cursor.fetchone():
             raise ValueError("Email is already registered")
 
-        cursor.execute("""
-            INSERT INTO users (id, email, password_hash, salt, display_name, preferred_language, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (user_id, clean_email, hashed, salt, clean_name, preferred_language, now_iso, now_iso))
+        try:
+            cursor.execute("""
+                INSERT INTO users (id, email, password_hash, salt, display_name, preferred_language, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (user_id, clean_email, hashed, salt, clean_name, preferred_language, now_iso, now_iso))
+        except sqlite3.IntegrityError as exc:
+            raise ValueError("Email is already registered") from exc
 
         cursor.execute("""
             INSERT INTO profiles (id, display_name, email, preferred_language, created_at, updated_at)
@@ -203,16 +217,26 @@ def authenticate_user(email: str, password: str) -> Optional[Dict[str, Any]]:
         if not _verify_password(password, row["password_hash"], row["salt"]):
             return None
 
+        if (
+            not row["password_hash"].startswith(("$2a$", "$2b$", "$2y$"))
+            and len(password.encode("utf-8")) <= 72
+        ):
+            upgraded_hash, _ = _hash_password(password)
+            cursor.execute(
+                "UPDATE users SET password_hash = ?, salt = '', updated_at = ? WHERE id = ?",
+                (upgraded_hash, datetime.now(timezone.utc).isoformat(), row["id"])
+            )
+
         user_id = row["id"]
-        # Generate new session token (valid for 30 days)
+        # New sessions store only a hash; old plaintext session rows remain valid.
         token = secrets.token_urlsafe(32)
         now = datetime.now(timezone.utc)
-        expires = (now + timedelta(days=30)).isoformat()
+        expires = (now + timedelta(days=settings.SESSION_TTL_DAYS)).isoformat()
 
         cursor.execute("""
             INSERT INTO auth_sessions (token, user_id, expires_at, created_at)
             VALUES (?, ?, ?, ?)
-        """, (token, user_id, expires, now.isoformat()))
+        """, (hash_session_token(token), user_id, expires, now.isoformat()))
         conn.commit()
 
     return {
@@ -238,8 +262,8 @@ def get_user_by_token(token: str) -> Optional[Dict[str, Any]]:
             SELECT u.id, u.email, u.display_name, u.preferred_language, u.created_at
             FROM auth_sessions s
             JOIN users u ON s.user_id = u.id
-            WHERE s.token = ? AND s.expires_at > ?
-        """, (token, now_iso))
+            WHERE s.token IN (?, ?) AND s.expires_at > ?
+        """, (hash_session_token(token), token, now_iso))
         row = cursor.fetchone()
         if not row:
             return None
@@ -311,7 +335,10 @@ def delete_session(token: str) -> bool:
     init_local_db()
     with get_db_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("DELETE FROM auth_sessions WHERE token = ?", (token,))
+        cursor.execute(
+            "DELETE FROM auth_sessions WHERE token IN (?, ?)",
+            (hash_session_token(token), token)
+        )
         conn.commit()
     return True
 
@@ -586,4 +613,3 @@ def delete_sentence_record_by_id(record_id: str, user_id: Optional[str] = None) 
         deleted = cursor.rowcount > 0
         conn.commit()
     return deleted
-

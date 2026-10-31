@@ -120,10 +120,13 @@ class InferenceService:
         self.model = None
         self.metadata = {}
         self.status = "unavailable"
+        self.gesture_engine = None
         self._load_model()
 
     def _load_model(self):
         """Loads trained Random Forest model and metadata if available."""
+        from ml.gesture_engine import HybridGestureEngine
+
         model_path = settings.model_path
         metadata_path = settings.metadata_path
 
@@ -131,6 +134,7 @@ class InferenceService:
             self.model = None
             self.metadata = {}
             self.status = "unavailable"
+            self.gesture_engine = HybridGestureEngine(ml_model=None, metadata={})
             print(f"[InferenceService] Model file not found at '{model_path}'. Status: unavailable.")
             return
 
@@ -149,11 +153,13 @@ class InferenceService:
                 }
                 self.status = "trained"
 
+            self.gesture_engine = HybridGestureEngine(ml_model=self.model, metadata=self.metadata)
             print(f"[InferenceService] Successfully loaded model from '{model_path}'. Status: {self.status}.")
         except Exception as e:
             self.model = None
             self.metadata = {}
             self.status = "unavailable"
+            self.gesture_engine = HybridGestureEngine(ml_model=None, metadata={})
             print(f"[InferenceService] Error loading model from '{model_path}': {e}")
 
     def reload(self):
@@ -425,7 +431,25 @@ class InferenceService:
                 "timestamp": now_iso
             }
 
-        # Preprocess features
+        # If full landmarks are provided, leverage HybridGestureEngine for biomechanical disambiguation + ML
+        if landmarks is not None and len(landmarks) >= 21:
+            try:
+                pts = [_to_landmark_dict(pt) for pt in landmarks]
+                hybrid_res = self.gesture_engine.disambiguate_and_predict(
+                    landmarks=pts,
+                    handedness=handedness or "Right",
+                    history_frames=None,
+                    custom_threshold=threshold,
+                    mode="general"
+                )
+                hybrid_res["rejection_threshold_used"] = threshold
+                hybrid_res["hands_detected"] = 1
+                hybrid_res["model_version"] = self.metadata.get("version", "v2.5.0-hybrid")
+                return hybrid_res
+            except Exception as e:
+                print(f"[InferenceService] Hybrid gesture engine error, falling back to basic ML: {e}")
+
+        # Preprocess features if landmarks weren't used or failed
         try:
             if features is not None and len(features) == FEATURE_DIMENSION:
                 feat = np.array(features, dtype=np.float32)
@@ -518,6 +542,96 @@ class InferenceService:
             "rejection_threshold_used": threshold,
             "timestamp": now_iso
         }
+
+    def predict_sequence(
+        self,
+        frames: List[Any],
+        handedness: Optional[str] = "Right",
+        custom_threshold: Optional[float] = None,
+        mode: Optional[str] = "general"
+    ) -> Dict[str, Any]:
+        """
+        Processes a temporal sequence of landmark frames.
+        Analyzes motion trajectory, velocity, direction reversals,
+        and executes hybrid static + dynamic gesture classification.
+        """
+        threshold = custom_threshold if custom_threshold is not None else settings.CONFIDENCE_THRESHOLD
+        now_iso = datetime.now(timezone.utc).isoformat()
+
+        if not frames:
+            return {
+                "detected": False,
+                "label": None,
+                "english_meaning": "No frames provided in sequence",
+                "status": "no_hand",
+                "state": "waiting_hand",
+                "confidence": None,
+                "is_verified_isl": False,
+                "gesture_type": "dynamic",
+                "hands_detected": 0,
+                "all_probabilities": None,
+                "rejection_threshold_used": threshold,
+                "timestamp": now_iso
+            }
+
+        latest_frame = frames[-1]
+        raw_lms = latest_frame.get("landmarks") if isinstance(latest_frame, dict) else getattr(latest_frame, "landmarks", None)
+        if not raw_lms:
+            return {
+                "detected": False,
+                "label": None,
+                "english_meaning": "No landmarks in latest sequence frame",
+                "status": "no_hand",
+                "state": "waiting_hand",
+                "confidence": None,
+                "is_verified_isl": False,
+                "gesture_type": "dynamic",
+                "hands_detected": 0,
+                "all_probabilities": None,
+                "rejection_threshold_used": threshold,
+                "timestamp": now_iso
+            }
+
+        try:
+            pts = [_to_landmark_dict(p) for p in raw_lms]
+
+            # Convert frame landmarks to dicts for temporal sequence analyzer
+            clean_frames = []
+            for f in frames:
+                f_lms = f.get("landmarks") if isinstance(f, dict) else getattr(f, "landmarks", None)
+                if f_lms:
+                    clean_frames.append({
+                        "landmarks": [_to_landmark_dict(p) for p in f_lms],
+                        "timestamp": f.get("timestamp") if isinstance(f, dict) else getattr(f, "timestamp", None),
+                        "handedness": f.get("handedness", handedness) if isinstance(f, dict) else getattr(f, "handedness", handedness)
+                    })
+
+            result = self.gesture_engine.disambiguate_and_predict(
+                landmarks=pts,
+                handedness=handedness or "Right",
+                history_frames=clean_frames,
+                custom_threshold=threshold,
+                mode=mode or "general"
+            )
+            result["rejection_threshold_used"] = threshold
+            result["hands_detected"] = 1
+            result["model_version"] = self.metadata.get("version", "v2.5.0-hybrid")
+            return result
+        except Exception as e:
+            return {
+                "detected": False,
+                "label": None,
+                "english_meaning": f"Sequence inference error: {str(e)}",
+                "status": "error",
+                "state": "unknown_gesture",
+                "confidence": None,
+                "is_verified_isl": False,
+                "gesture_type": "dynamic",
+                "hands_detected": 1,
+                "all_probabilities": None,
+                "rejection_threshold_used": threshold,
+                "timestamp": now_iso
+            }
 
 
 inference_service = InferenceService()

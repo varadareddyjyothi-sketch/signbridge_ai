@@ -41,6 +41,8 @@ function resolveApiBase(): string {
 const API_BASE = resolveApiBase();
 const TOKEN_KEY = 'signbridge_auth_token';
 
+// Preserved token for cross-origin or persistent session
+
 function buildApiUrl(path: string): URL {
   return new URL(`${API_BASE}${path}`, window.location.origin);
 }
@@ -58,6 +60,22 @@ function getStoredToken(): string | null {
   }
 }
 
+function formatApiError(detail: unknown, fallback: string): string {
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail)) {
+    const messages = detail
+      .map((item) => {
+        if (typeof item === 'object' && item !== null && 'msg' in item && typeof item.msg === 'string') {
+          return item.msg;
+        }
+        return null;
+      })
+      .filter((message): message is string => message !== null);
+    if (messages.length > 0) return messages.join('; ');
+  }
+  return fallback;
+}
+
 async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 10000): Promise<Response> {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeoutMs);
@@ -72,6 +90,7 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutM
     const response = await fetch(url, {
       ...options,
       headers,
+      credentials: 'include',
       signal: controller.signal
     });
     return response;
@@ -410,26 +429,6 @@ export const api = {
   // Authentication & Profile Services
   // =========================================================================
 
-  getAuthToken(): string | null {
-    return getStoredToken();
-  },
-
-  setAuthToken(token: string): void {
-    try {
-      localStorage.setItem(TOKEN_KEY, token);
-    } catch {
-      // Ignore localStorage errors
-    }
-  },
-
-  clearAuthToken(): void {
-    try {
-      localStorage.removeItem(TOKEN_KEY);
-    } catch {
-      // Ignore localStorage errors
-    }
-  },
-
   async register(
     email: string,
     password: string,
@@ -448,11 +447,13 @@ export const api = {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({ detail: `Registration failed (HTTP ${res.status})` }));
-      throw new Error(err.detail || 'Registration failed');
+      throw new Error(formatApiError(err.detail, `Registration failed (HTTP ${res.status})`));
     }
     const data: AuthResponse = await res.json();
     if (data.token) {
-      this.setAuthToken(data.token);
+      try {
+        localStorage.setItem(TOKEN_KEY, data.token);
+      } catch {}
     }
     return data;
   },
@@ -465,11 +466,13 @@ export const api = {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({ detail: `Login failed (HTTP ${res.status})` }));
-      throw new Error(err.detail || 'Invalid email or password');
+      throw new Error(formatApiError(err.detail, `Login failed (HTTP ${res.status})`));
     }
     const data: AuthResponse = await res.json();
     if (data.token) {
-      this.setAuthToken(data.token);
+      try {
+        localStorage.setItem(TOKEN_KEY, data.token);
+      } catch {}
     }
     return data;
   },
@@ -478,9 +481,10 @@ export const api = {
     const res = await fetchWithTimeout(`${API_BASE}/auth/me`);
     if (!res.ok) {
       if (res.status === 401) {
-        this.clearAuthToken();
+        throw new Error('No active session');
       }
-      throw new Error(`Failed to load profile: HTTP ${res.status}`);
+      const error = await res.json().catch(() => ({ detail: `Failed to load profile (HTTP ${res.status})` }));
+      throw new Error(formatApiError(error.detail, `Failed to load profile (HTTP ${res.status})`));
     }
     return res.json();
   },
@@ -500,13 +504,14 @@ export const api = {
 
   async logout(): Promise<void> {
     try {
-      await fetchWithTimeout(`${API_BASE}/auth/logout`, {
-        method: 'POST'
-      });
-    } catch {
-      // Best effort remote logout
-    } finally {
-      this.clearAuthToken();
+      localStorage.removeItem(TOKEN_KEY);
+    } catch {}
+    const res = await fetchWithTimeout(`${API_BASE}/auth/logout`, {
+      method: 'POST'
+    });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ detail: `Logout failed (HTTP ${res.status})` }));
+      throw new Error(formatApiError(error.detail, `Logout failed (HTTP ${res.status})`));
     }
   },
 

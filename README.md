@@ -230,7 +230,6 @@ SignBridge AI works out of the box with embedded SQLite. To connect MongoDB Atla
    ```env
    MONGODB_URI=mongodb+srv://<username>:<password>@cluster0.mongodb.net/signbridge_ai?retryWrites=true&w=majority
    MONGODB_DB_NAME=signbridge_ai
-   JWT_SECRET=your-secret-key-here
    ```
 4. Restart the backend. The navbar and `/health` will reflect `Storage: MongoDB Atlas`.
 5. Run `POST /auth/migrate-to-mongo` to copy any existing local SQLite records into MongoDB Atlas without duplicates.
@@ -266,11 +265,10 @@ DeployXa automatically detects the root `Dockerfile` and builds a secure multi-s
    | Variable | Value | Description |
    |---|---|---|
    | `ENVIRONMENT` | `production` | Enables production security & logging |
-   | `ALLOWED_ORIGINS` | `*` (or your DeployXa domain) | Configures CORS for browser clients |
+   | `ALLOWED_ORIGINS` | `https://your-frontend.example` | Exact comma-separated browser origins; wildcard origins are not allowed |
    | `CONFIDENCE_THRESHOLD` | `0.65` | Anti-hallucination rejection threshold |
-   | `MONGODB_URI` | *(optional)* | MongoDB Atlas connection string (falls back to SQLite) |
+   | `MONGODB_URI` | *(required)* | MongoDB Atlas connection string; production returns 503 when MongoDB is unavailable |
    | `MONGODB_DB_NAME` | `signbridge_ai` | MongoDB database name |
-   | `JWT_SECRET` | `your-secret-key` | Secret key for JWT session hashing |
 3. **Deploy**:
    - Click **Deploy**. DeployXa will automatically run the multi-stage Docker build, execute health checks on `/health`, and assign a secure HTTPS URL.
 
@@ -349,4 +347,3 @@ After deploying on DeployXa, verify the live deployment:
 - [ ] Two-handed gesture classification for compound ISL phrases.
 - [ ] User profile customization for personal gesture shortcuts.
 - [ ] Offline PWA deployment with WebAssembly model execution.
-

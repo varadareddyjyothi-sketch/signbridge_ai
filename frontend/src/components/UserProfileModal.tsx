@@ -8,7 +8,7 @@ interface UserProfileModalProps {
   user: UserProfile;
   onClose: () => void;
   onProfileUpdated: (updatedUser: UserProfile) => void;
-  onLogout: () => void;
+  onLogout: () => Promise<void>;
 }
 
 export const UserProfileModal: React.FC<UserProfileModalProps> = ({
@@ -54,6 +54,15 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
       setStatusMsg({ type: 'error', text: err.message || 'Export failed. Check connection.' });
     } finally {
       setExporting(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    setStatusMsg(null);
+    try {
+      await onLogout();
+    } catch (err: any) {
+      setStatusMsg({ type: 'error', text: err.message || 'Failed to sign out.' });
     }
   };
 
@@ -206,7 +215,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span>Account Security</span>
             <span className="badge badge-success" style={{ fontSize: '0.7rem' }}>
-              PBKDF2 Salted Auth
+              bcrypt + HttpOnly Session
             </span>
           </div>
         </div>
@@ -298,7 +307,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
           <button
             type="button"
-            onClick={onLogout}
+            onClick={handleLogout}
             className="btn btn-danger"
             style={{ width: '100%', padding: '9px 14px', fontSize: '0.86rem', justifyContent: 'center' }}
           >

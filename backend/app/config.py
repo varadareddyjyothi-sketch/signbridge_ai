@@ -23,11 +23,9 @@ class Settings(BaseSettings):
     HOST: str = os.getenv("HOST", "0.0.0.0" if os.getenv("ENVIRONMENT") == "production" else "127.0.0.1")
     PORT: int = int(os.getenv("PORT", "8000"))
 
-    # CORS
-    ALLOWED_ORIGINS: str = os.getenv(
-        "ALLOWED_ORIGINS",
-        "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://localhost:8000"
-    )
+    # Configure the exact browser origins in production. Development loopback
+    # origins are added only outside production.
+    ALLOWED_ORIGINS: str = os.getenv("ALLOWED_ORIGINS", "")
 
     # ML Model & Dataset Paths (anchored to BASE_DIR)
     BASE_DIR: Path = BASE_DIR
@@ -41,8 +39,8 @@ class Settings(BaseSettings):
     # MongoDB Configuration (Atlas or local connection string)
     MONGODB_URI: str = os.getenv("MONGODB_URI", "")
     MONGODB_DB_NAME: str = os.getenv("MONGODB_DB_NAME", "signbridge_ai")
-    JWT_SECRET: str = os.getenv("JWT_SECRET", "signbridge_ai_super_secret_jwt_key_2026_secured")
-    JWT_ALGORITHM: str = "HS256"
+    SESSION_COOKIE_NAME: str = "signbridge_session"
+    SESSION_TTL_DAYS: int = 30
 
     # Local SQLite Fallback DB Path
     SQLITE_DB_PATH: str = str(BASE_DIR / "backend" / "app" / "database" / "signbridge_local.db")
@@ -52,25 +50,19 @@ class Settings(BaseSettings):
 
     @property
     def cors_origins(self) -> List[str]:
-        if not self.ALLOWED_ORIGINS or self.ALLOWED_ORIGINS.strip() == "*":
-            return ["*"]
         origins = [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",") if origin.strip()]
-        dev_ports = [
-            "http://localhost:5173", "http://127.0.0.1:5173",
-            "http://localhost:5174", "http://127.0.0.1:5174",
-            "http://localhost:5175", "http://127.0.0.1:5175",
-            "http://localhost:3000", "http://127.0.0.1:3000",
-            "http://localhost:8000", "http://127.0.0.1:8000"
-        ]
-        for dp in dev_ports:
-            if dp not in origins:
-                origins.append(dp)
+        if self.ENVIRONMENT.lower() != "production":
+            dev_origins = [
+                f"http://{host}:{port}"
+                for host in ("localhost", "127.0.0.1")
+                for port in (3000, 5173, 5174, 5175, 8000)
+            ]
+            origins.extend(origin for origin in dev_origins if origin not in origins)
         return origins
 
     @property
     def allow_credentials(self) -> bool:
-        # Per CORS spec, credentials cannot be enabled when allow_origins is wildcard "*"
-        return "*" not in self.cors_origins
+        return True
 
     @property
     def model_path(self) -> str:

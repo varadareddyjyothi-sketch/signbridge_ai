@@ -63,10 +63,11 @@ export function App() {
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [modelStatus, setModelStatus] = useState<ModelStatus | null>(null);
   const [practiceTargetSign, setPracticeTargetSign] = useState<{ id: string; name: string } | null>(null);
+  const [authRestoreError, setAuthRestoreError] = useState<string | null>(null);
 
   // User Authentication State & Session Loading
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
-  const [isAuthChecking, setIsAuthChecking] = useState<boolean>(() => Boolean(api.getAuthToken()));
+  const [isAuthChecking, setIsAuthChecking] = useState<boolean>(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(() => routeState.openAuth);
   const [authModalInitialMode, setAuthModalInitialMode] = useState<'login' | 'register'>(
     () => routeState.authMode || 'login'
@@ -119,21 +120,18 @@ export function App() {
 
   // Check and restore existing session on startup without logging user out on refresh
   useEffect(() => {
-    const token = api.getAuthToken();
-    if (token) {
-      api.getProfile()
-        .then((profile) => {
-          setCurrentUser(profile);
-          setIsAuthChecking(false);
-        })
-        .catch(() => {
-          api.clearAuthToken();
-          setCurrentUser(null);
-          setIsAuthChecking(false);
-        });
-    } else {
-      setIsAuthChecking(false);
-    }
+    api.getProfile()
+      .then((profile) => {
+        setCurrentUser(profile);
+        setAuthRestoreError(null);
+      })
+      .catch((error: unknown) => {
+        setCurrentUser(null);
+        if (!(error instanceof Error) || error.message !== 'No active session') {
+          setAuthRestoreError(error instanceof Error ? error.message : 'Unable to restore the session.');
+        }
+      })
+      .finally(() => setIsAuthChecking(false));
   }, []);
 
   // Route Guard: Unauthenticated users attempting to access protected tabs are prompted to authenticate
@@ -208,6 +206,7 @@ export function App() {
 
   const handleAuthSuccess = (user: UserProfile) => {
     setCurrentUser(user);
+    setAuthRestoreError(null);
     setIsAuthModalOpen(false);
     const destination = pendingRedirectTab || 'home';
     setPendingRedirectTab(null);
@@ -218,7 +217,7 @@ export function App() {
     setCurrentUser(updatedUser);
   };
 
-  const handleLogout = async () => {
+  const handleLogout = async (): Promise<void> => {
     await api.logout();
     setCurrentUser(null);
     setIsProfileModalOpen(false);
@@ -243,6 +242,22 @@ export function App() {
 
       {/* Main Content Area */}
       <main className="container" style={{ flex: 1, padding: '24px 20px' }}>
+        {authRestoreError && (
+          <div
+            role="alert"
+            style={{
+              marginBottom: '16px',
+              padding: '10px 12px',
+              backgroundColor: '#fff1f2',
+              border: '1px solid #fecdd3',
+              borderRadius: '8px',
+              color: '#be123c'
+            }}
+          >
+            Could not restore your sign-in session: {authRestoreError}
+          </div>
+        )}
+
         {/* Loading session state */}
         {isAuthChecking && (
           <div style={{ padding: '48px', textAlign: 'center', color: '#64748b' }}>
