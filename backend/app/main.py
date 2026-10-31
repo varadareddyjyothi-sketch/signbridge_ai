@@ -199,10 +199,17 @@ async def serve_spa_and_static(request: Request, full_path: str):
 
     # 3. Check for index.html for SPA client-side routing fallback (e.g. /recognition, /history, /guide)
     index_file = os.path.join(settings.STATIC_DIR, "index.html")
+    if not os.path.isfile(index_file):
+        for candidate in [os.path.join(str(settings.BASE_DIR), "dist", "index.html"), "/app/dist/index.html"]:
+            if os.path.isfile(candidate):
+                index_file = candidate
+                break
+
     if os.path.isfile(index_file):
         # Only serve index.html for browser document navigations, not missing assets.
         accept = request.headers.get("accept", "")
-        if "text/html" in accept:
+        sec_dest = request.headers.get("sec-fetch-dest", "")
+        if "text/html" in accept or sec_dest == "document":
             return FileResponse(index_file, headers={"Cache-Control": "no-cache"})
 
     # 4. If neither physical asset nor SPA build exists, return structured JSON 404
