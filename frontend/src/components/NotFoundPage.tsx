@@ -61,7 +61,7 @@ export const NotFoundPage: React.FC<NotFoundPageProps> = ({ attemptedPath, onNav
               borderRadius: '9999px'
             }}
           >
-            HTTP 404 — Route Not Found
+            HTTP 404 — Page Not Found
           </span>
         </div>
 
@@ -74,7 +74,7 @@ export const NotFoundPage: React.FC<NotFoundPageProps> = ({ attemptedPath, onNav
             letterSpacing: '-0.02em'
           }}
         >
-          Page Doesn't Exist
+          404 – Page Not Found
         </h1>
 
         <p style={{ color: '#64748b', fontSize: '0.96rem', lineHeight: 1.6, marginBottom: '24px' }}>

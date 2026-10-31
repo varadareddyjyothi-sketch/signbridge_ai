@@ -17,8 +17,9 @@ from backend.app.schemas.history import (
     SentenceHistoryEntry
 )
 from backend.app.database.history_service import history_service
+from typing import Optional
 from backend.app.services.excel_export_service import excel_export_service
-from backend.app.api.auth import get_current_user_required
+from backend.app.api.auth import get_current_user_required, get_current_user_optional
 
 router = APIRouter(prefix="/history", tags=["History & Export"])
 
@@ -31,14 +32,17 @@ router = APIRouter(prefix="/history", tags=["History & Export"])
 def get_history(
     request: Request,
     limit: int = Query(50, ge=1, le=200, description="Max records to retrieve"),
-    current_user: dict = Depends(get_current_user_required)
+    current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
-    """Retrieves only the authenticated user's recognition history."""
+    """Retrieves only the authenticated user's recognition history or serves SPA to browser."""
     accept = request.headers.get("accept", "")
     index_path = os.path.join(settings.STATIC_DIR, "index.html")
-    # If visited from a browser address bar (Accept text/html and not JSON-first)
+    # If visited directly from a browser address bar (Accept text/html and not JSON-first)
     if "text/html" in accept and "application/json" not in accept and os.path.isfile(index_path):
         return FileResponse(index_path, headers={"Cache-Control": "no-cache"})
+
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required or invalid session")
 
     effective_user_id = current_user["id"]
     items = history_service.get_history(user_id=effective_user_id, limit=limit)

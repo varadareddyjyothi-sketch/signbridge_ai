@@ -163,8 +163,12 @@ async def serve_spa_and_static(request: Request, full_path: str):
     """
     normalized_path = f"/{full_path}"
 
-    # 1. API Route Protection: Unknown API calls must return JSON 404, never HTML
+    # 1. API Route Protection: Return JSON 404 for API calls; serve SPA index.html for browser document navigation
     if any(normalized_path == prefix or normalized_path.startswith(f"{prefix}/") for prefix in API_ROUTE_PREFIXES):
+        accept = request.headers.get("accept", "")
+        index_file = os.path.join(settings.STATIC_DIR, "index.html")
+        if request.method == "GET" and "text/html" in accept and "application/json" not in accept and os.path.isfile(index_file):
+            return FileResponse(index_file, headers={"Cache-Control": "no-cache"})
         return JSONResponse(
             status_code=404,
             content={"detail": f"API endpoint '{normalized_path}' not found", "status_code": 404}

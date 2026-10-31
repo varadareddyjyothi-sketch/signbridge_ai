@@ -16,40 +16,76 @@ interface ParsedRoute {
   isNotFound: boolean;
   openAuth: boolean;
   authMode?: 'login' | 'register';
+  openProfile?: boolean;
   path: string;
 }
 
 function parseCurrentRoute(): ParsedRoute {
-  // Support both HTML5 path (/recognition) and hash routing (/#recognition or #library)
-  const pathname = window.location.pathname.toLowerCase().replace(/\/+$/, '') || '/';
-  const hash = window.location.hash.toLowerCase().replace(/^#\/?/, '').replace(/\/+$/, '');
+  // Support HTML5 path (/recognition), hash routing (/#recognition or #/library), and query SPA redirects (/?p=/history)
+  let rawPath = window.location.pathname.toLowerCase().replace(/\/+$/, '') || '/';
+  const rawHash = window.location.hash.toLowerCase().replace(/^#\/?/, '').replace(/\/+$/, '');
+  const search = window.location.search;
 
-  const segment = hash || pathname.replace(/^\//, '');
+  // Handle GitHub Pages SPA redirection trick if redirected via /?p=... or /?/path
+  if (search.includes('?p=') || search.includes('&p=')) {
+    const params = new URLSearchParams(search);
+    const p = params.get('p');
+    if (p) rawPath = p.toLowerCase().replace(/\/+$/, '') || '/';
+  } else if (search.startsWith('?/')) {
+    rawPath = search.slice(2).split('&')[0].toLowerCase().replace(/\/+$/, '') || '/';
+  }
 
-  if (!segment || segment === 'home' || segment === 'welcome' || segment === '') {
+  // Strip query parameters from hash or path if any
+  const cleanHash = rawHash.split('?')[0].replace(/^\/+/, '');
+  const cleanPath = rawPath.split('?')[0].replace(/^\/+/, '');
+
+  // Extract path segments
+  const pathSegments = cleanPath.split('/').filter(Boolean);
+  const hashSegments = cleanHash.split('/').filter(Boolean);
+
+  let segments = hashSegments.length > 0 ? hashSegments : pathSegments;
+
+  // Ignore root prefix if project is deployed under a subfolder (e.g. /signbridge_ai/..., /signbridge/..., /touch/...)
+  if (segments.length > 1 && ['signbridge_ai', 'signbridge', 'touch', 'app', 'dist'].includes(segments[0])) {
+    segments = segments.slice(1);
+  }
+
+  const segment = segments[0] || '';
+
+  // 1. Home / Root
+  if (!segment || ['home', 'welcome', 'main', 'index', 'index.html', 'app'].includes(segment)) {
     return { tab: 'home', isNotFound: false, openAuth: false, path: '/' };
   }
-  if (segment === 'recognition' || segment === 'dashboard' || segment === 'live') {
+
+  // 2. Recognition & Touch modules (SignBridge AI - TOUCH)
+  if (['recognition', 'touch', 'dashboard', 'live', 'camera', 'detect', 'detector', 'practice', 'phrases', 'quickphrases', 'translate', 'sentence', 'sentences', 'isl'].includes(segment)) {
     return { tab: 'recognition', isNotFound: false, openAuth: false, path: '/recognition' };
   }
-  if (segment === 'guide' || segment === 'library') {
+
+  // 3. ISL Guide & Reference Library
+  if (['guide', 'library', 'learn', 'tutorial', 'dictionary', 'vocabulary', 'alphabet', 'signs'].includes(segment)) {
     return { tab: 'guide', isNotFound: false, openAuth: false, path: '/guide' };
   }
-  if (segment === 'history') {
+
+  // 4. Conversation History & Export Logs
+  if (['history', 'logs', 'records', 'export'].includes(segment)) {
     return { tab: 'history', isNotFound: false, openAuth: false, path: '/history' };
   }
-  if (segment === 'login' || segment === 'signin') {
+
+  // 5. Authentication routes
+  if (['login', 'signin', 'auth'].includes(segment)) {
     return { tab: 'home', isNotFound: false, openAuth: true, authMode: 'login', path: '/login' };
   }
-  if (segment === 'register' || segment === 'signup') {
+  if (['register', 'signup', 'join'].includes(segment)) {
     return { tab: 'home', isNotFound: false, openAuth: true, authMode: 'register', path: '/register' };
   }
 
-  // If path doesn't match known routes and is not index.html
-  if (segment === 'index.html') {
-    return { tab: 'home', isNotFound: false, openAuth: false, path: '/' };
+  // 6. User Profile
+  if (['profile', 'account', 'settings'].includes(segment)) {
+    return { tab: 'home', isNotFound: false, openAuth: false, openProfile: true, path: '/profile' };
   }
 
+  // Unrecognized route -> 404 Not Found Page
   return {
     tab: 'home',
     isNotFound: true,
@@ -72,7 +108,7 @@ export function App() {
   const [authModalInitialMode, setAuthModalInitialMode] = useState<'login' | 'register'>(
     () => routeState.authMode || 'login'
   );
-  const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(() => Boolean(routeState.openProfile));
   const [pendingRedirectTab, setPendingRedirectTab] = useState<AppNavTab | null>(null);
 
   const activeTab = routeState.tab;
@@ -107,6 +143,9 @@ export function App() {
       setIsAuthModalOpen(parsed.openAuth);
       if (parsed.openAuth) {
         setAuthModalInitialMode(parsed.authMode || 'login');
+      }
+      if (parsed.openProfile) {
+        setIsProfileModalOpen(true);
       }
     };
 
