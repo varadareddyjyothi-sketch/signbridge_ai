@@ -267,8 +267,8 @@ async def test_full_api_auth_and_history_in_mongo_mode(setup_mock_mongo):
         res_reg = await ac.post("/auth/register", json=reg_payload)
         assert res_reg.status_code == 200
         reg_data = res_reg.json()
-        assert "token" not in reg_data
-        token = res_reg.cookies.get("signbridge_session")
+        assert "token" in reg_data
+        token = reg_data["token"]
         headers = {"Authorization": f"Bearer {token}"}
 
         # 3. Check /auth/me

@@ -66,6 +66,7 @@ app.include_router(dataset.router, prefix="/api")
 app.include_router(vocabulary.router, prefix="/api")
 app.include_router(models.router, prefix="/api")
 app.include_router(sentence.router, prefix="/api")
+app.include_router(gesture.router, prefix="/api")
 
 
 # API Route Prefixes that must NEVER return HTML or SPA fallbacks
@@ -82,6 +83,7 @@ API_ROUTE_PREFIXES = (
     "/dataset",
     "/vocabulary",
     "/translate",
+    "/gesture",
     "/api"
 )
 
@@ -171,11 +173,11 @@ async def serve_spa_and_static(request: Request, full_path: str):
     """
     normalized_path = f"/{full_path}"
 
-    # 1. API Route Protection: Return JSON 404 for API calls; serve SPA index.html for browser document navigation
+    # 1. API Route Protection: Unknown API routes MUST return structured JSON 404, NEVER HTML
     if any(normalized_path == prefix or normalized_path.startswith(f"{prefix}/") for prefix in API_ROUTE_PREFIXES):
         accept = request.headers.get("accept", "")
         index_file = os.path.join(settings.STATIC_DIR, "index.html")
-        if request.method == "GET" and "text/html" in accept and "application/json" not in accept and os.path.isfile(index_file):
+        if normalized_path == "/history" and request.method == "GET" and "text/html" in accept and "application/json" not in accept and os.path.isfile(index_file):
             return FileResponse(index_file, headers={"Cache-Control": "no-cache"})
         return JSONResponse(
             status_code=404,

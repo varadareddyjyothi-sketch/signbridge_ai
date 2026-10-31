@@ -21,7 +21,7 @@ from backend.app.services.inference_service import inference_service
 from backend.app.database.history_service import history_service
 from backend.app.services.vocabulary_service import vocabulary_service
 
-router = APIRouter(prefix="/api/gesture", tags=["Gesture Recognition"])
+router = APIRouter(prefix="/gesture", tags=["Gesture Recognition"])
 
 
 @router.post("/predict", response_model=PredictionResponse)

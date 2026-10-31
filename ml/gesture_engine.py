@@ -419,8 +419,12 @@ class HybridGestureEngine:
 
         if self.ml_model is not None:
             try:
-                features_109 = extract_model_features(anatomy.norm_features).reshape(1, -1)
-                probs = self.ml_model.predict_proba(features_109)[0]
+                expected_dim = getattr(self.ml_model, "n_features_in_", 63)
+                if expected_dim == 109:
+                    features_vec = extract_model_features(anatomy.norm_features).reshape(1, -1)
+                else:
+                    features_vec = anatomy.norm_features.reshape(1, -1)
+                probs = self.ml_model.predict_proba(features_vec)[0]
                 max_idx = int(np.argmax(probs))
                 ml_confidence = float(probs[max_idx])
                 ml_label = str(self.ml_model.classes_[max_idx])

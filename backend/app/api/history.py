@@ -29,7 +29,7 @@ router = APIRouter(prefix="/history", tags=["History & Export"])
 # =========================================================================
 
 @router.get("", response_model=HistoryResponse)
-def get_history(
+async def get_history(
     request: Request,
     limit: int = Query(50, ge=1, le=200, description="Max records to retrieve"),
     current_user: Optional[dict] = Depends(get_current_user_optional)
@@ -56,7 +56,7 @@ def get_history(
 
 
 @router.post("", response_model=HistoryEntry)
-def save_history(
+async def save_history(
     entry: HistoryCreateRequest,
     current_user: dict = Depends(get_current_user_required)
 ):
@@ -73,7 +73,7 @@ def save_history(
 
 
 @router.delete("")
-def clear_history(
+async def clear_history(
     current_user: dict = Depends(get_current_user_required)
 ):
     """Clears only the authenticated user's recognition history."""
@@ -95,7 +95,7 @@ def clear_history(
 
 @router.get("/sentence", response_model=SentenceHistoryResponse)
 @router.get("/sentences", response_model=SentenceHistoryResponse)
-def get_sentence_history(
+async def get_sentence_history(
     limit: int = Query(100, ge=1, le=500, description="Max records to retrieve"),
     current_user: dict = Depends(get_current_user_required)
 ):
@@ -111,7 +111,7 @@ def get_sentence_history(
 
 
 @router.post("/sentence", response_model=SentenceHistoryEntry)
-def save_sentence_history(
+async def save_sentence_history(
     entry: SentenceHistoryCreateRequest,
     current_user: dict = Depends(get_current_user_required)
 ):
@@ -132,7 +132,7 @@ def save_sentence_history(
 
 
 @router.delete("/sentence")
-def clear_sentence_history(
+async def clear_sentence_history(
     current_user: dict = Depends(get_current_user_required)
 ):
     """Clears only the authenticated user's confirmed sentences."""
@@ -146,7 +146,7 @@ def clear_sentence_history(
 
 
 @router.delete("/sentence/{record_id}")
-def delete_single_sentence(
+async def delete_single_sentence(
     record_id: str,
     current_user: dict = Depends(get_current_user_required)
 ):
@@ -154,8 +154,6 @@ def delete_single_sentence(
     effective_user_id = current_user["id"]
     deleted = history_service.delete_sentence_by_id(record_id=record_id, user_id=effective_user_id)
     if not deleted:
-        if history_service.sentence_exists_any(record_id=record_id):
-            raise HTTPException(status_code=403, detail="You do not have permission to delete this sentence record")
         raise HTTPException(status_code=404, detail="Sentence record not found")
     return {
         "success": True,
@@ -169,7 +167,7 @@ def delete_single_sentence(
 # =========================================================================
 
 @router.get("/export/excel")
-def export_excel(
+async def export_excel(
     current_user: dict = Depends(get_current_user_required)
 ):
     """
@@ -208,7 +206,7 @@ def export_excel(
 # =========================================================================
 
 @router.delete("/{record_id}")
-def delete_single_history(
+async def delete_single_history(
     record_id: str,
     current_user: dict = Depends(get_current_user_required)
 ):
@@ -216,8 +214,6 @@ def delete_single_history(
     effective_user_id = current_user["id"]
     deleted = history_service.delete_entry_by_id(record_id=record_id, user_id=effective_user_id)
     if not deleted:
-        if history_service.entry_exists_any(record_id=record_id):
-            raise HTTPException(status_code=403, detail="You do not have permission to delete this recognition record")
         raise HTTPException(status_code=404, detail="Recognition record not found")
     return {
         "success": True,

@@ -119,7 +119,7 @@ def get_current_user_required(
 # =========================================================================
 
 @router.post("/register", response_model=AuthResponse)
-def register(request: UserRegisterRequest, response: Response):
+async def register(request: UserRegisterRequest, response: Response):
     """
     Registers a new user with salted hashed password and returns an auth session.
     """
@@ -143,7 +143,7 @@ def register(request: UserRegisterRequest, response: Response):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 @router.post("/login", response_model=AuthResponse)
-def login(request: UserLoginRequest, response: Response):
+async def login(request: UserLoginRequest, response: Response):
     """
     Authenticates email and password, returning user profile and session token.
     """
@@ -160,7 +160,7 @@ def login(request: UserLoginRequest, response: Response):
 
 
 @router.get("/me", response_model=UserProfileResponse)
-def get_current_profile(current_user: dict = Depends(get_current_user_required)):
+async def get_current_profile(current_user: dict = Depends(get_current_user_required)):
     """
     Returns the currently authenticated user's profile.
     """
@@ -168,7 +168,7 @@ def get_current_profile(current_user: dict = Depends(get_current_user_required))
 
 
 @router.put("/profile", response_model=UserProfileResponse)
-def update_profile(
+async def update_profile(
     request: ProfileUpdateRequest,
     current_user: dict = Depends(get_current_user_required)
 ):
@@ -187,7 +187,7 @@ def update_profile(
 
 
 @router.post("/logout")
-def logout(
+async def logout(
     request: Request,
     response: Response,
     authorization: Optional[str] = Header(None)
