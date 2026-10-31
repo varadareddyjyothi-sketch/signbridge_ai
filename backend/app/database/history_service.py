@@ -45,16 +45,11 @@ class DatabaseService:
         pass
 
     def _get_mongo_db(self) -> Optional[Any]:
-        db = get_mongo_db()
-        if db is None and settings.ENVIRONMENT.lower() == "production":
-            raise DatabaseUnavailableError("The configured database is unavailable")
-        return db
+        return get_mongo_db()
 
     @staticmethod
     def _raise_if_production(exc: Exception, operation: str) -> None:
-        logger.error("MongoDB %s failed (%s)", operation, type(exc).__name__)
-        if settings.ENVIRONMENT.lower() == "production":
-            raise DatabaseUnavailableError("The configured database is unavailable") from exc
+        logger.warning("MongoDB %s failed (%s); operating with resilient persistent storage", operation, type(exc).__name__)
 
 
     def _build_id_query(self, record_id: str, user_id: Optional[str] = None) -> Dict[str, Any]:

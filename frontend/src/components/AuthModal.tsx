@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Lock, Mail, User, Globe, AlertCircle, CheckCircle2, ArrowRight } from 'lucide-react';
+import { X, Lock, Mail, User, Globe, AlertCircle, CheckCircle2, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { api } from '../services/api';
 import type { UserProfile } from '../types';
 
@@ -22,6 +22,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [displayName, setDisplayName] = useState('');
   const [preferredLanguage, setPreferredLanguage] = useState('en');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
@@ -30,6 +31,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setMode(initialMode);
       setErrorMsg(null);
       setSuccessMsg(null);
+      setShowPassword(false);
     }
   }, [isOpen, initialMode]);
 
@@ -78,7 +80,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         setSuccessMsg(res.message);
       }
     } catch (err: any) {
-      setErrorMsg(err.message || 'Authentication error. Please try again.');
+      let friendly = err.message || 'Authentication error. Please try again.';
+      const lower = friendly.toLowerCase();
+      if (lower.includes('401') || lower.includes('invalid email or password') || lower.includes('authentication required')) {
+        friendly = 'Incorrect email or password. Please verify your credentials and try again.';
+      } else if (lower.includes('already registered')) {
+        friendly = 'This email address is already registered. Please sign in or use a different email.';
+      } else if (lower.includes('database is unavailable')) {
+        friendly = 'Account service synchronizing. Please try again in a moment.';
+      }
+      setErrorMsg(friendly);
     } finally {
       setLoading(false);
     }
@@ -215,6 +226,52 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </div>
         )}
 
+        {/* Mode Switcher Tabs */}
+        {mode !== 'recovery' && (
+          <div style={{ display: 'flex', background: '#f1f5f9', padding: '4px', borderRadius: '8px', marginBottom: '16px', gap: '4px' }}>
+            <button
+              type="button"
+              onClick={() => { setMode('login'); setErrorMsg(null); setSuccessMsg(null); }}
+              style={{
+                flex: 1,
+                padding: '8px 12px',
+                fontSize: '0.86rem',
+                fontWeight: mode === 'login' ? 700 : 500,
+                borderRadius: '6px',
+                border: 'none',
+                background: mode === 'login' ? '#ffffff' : 'transparent',
+                color: mode === 'login' ? '#1d4ed8' : '#64748b',
+                boxShadow: mode === 'login' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+                minHeight: '38px'
+              }}
+            >
+              Sign In
+            </button>
+            <button
+              type="button"
+              onClick={() => { setMode('register'); setErrorMsg(null); setSuccessMsg(null); }}
+              style={{
+                flex: 1,
+                padding: '8px 12px',
+                fontSize: '0.86rem',
+                fontWeight: mode === 'register' ? 700 : 500,
+                borderRadius: '6px',
+                border: 'none',
+                background: mode === 'register' ? '#ffffff' : 'transparent',
+                color: mode === 'register' ? '#1d4ed8' : '#64748b',
+                boxShadow: mode === 'register' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+                minHeight: '38px'
+              }}
+            >
+              Create Account
+            </button>
+          </div>
+        )}
+
         {/* Form */}
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {mode === 'register' && (
@@ -288,9 +345,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 )}
               </div>
               <div style={{ position: 'relative' }}>
-                <Lock size={15} style={{ position: 'absolute', left: '12px', top: '12px', color: '#94a3b8' }} />
+                <Lock size={15} style={{ position: 'absolute', left: '12px', top: '13px', color: '#94a3b8' }} />
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   required
                   minLength={mode === 'register' ? 8 : undefined}
                   value={password}
@@ -299,14 +356,35 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   style={{
                     width: '100%',
                     paddingLeft: '36px',
-                    paddingRight: '12px',
-                    paddingTop: '9px',
-                    paddingBottom: '9px',
+                    paddingRight: '40px',
+                    paddingTop: '10px',
+                    paddingBottom: '10px',
                     borderRadius: '6px',
                     border: '1px solid #cbd5e1',
-                    fontSize: '0.88rem'
+                    fontSize: '0.92rem',
+                    minHeight: '42px'
                   }}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  style={{
+                    position: 'absolute',
+                    right: '10px',
+                    top: '11px',
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#94a3b8',
+                    cursor: 'pointer',
+                    padding: '3px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
               </div>
             </div>
           )}

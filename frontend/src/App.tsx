@@ -247,7 +247,8 @@ export function App() {
     setCurrentUser(user);
     setAuthRestoreError(null);
     setIsAuthModalOpen(false);
-    const destination = pendingRedirectTab || 'home';
+    // After login or registration, enter directly into the recognition dashboard
+    const destination = pendingRedirectTab || 'recognition';
     setPendingRedirectTab(null);
     navigate(destination);
   };

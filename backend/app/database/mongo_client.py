@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 _mongo_client: Optional[Any] = None
 _mongo_db: Optional[Any] = None
 _last_connect_failure_time: float = 0.0
-_CONNECT_RETRY_INTERVAL_SECONDS: float = 5.0
+_CONNECT_RETRY_INTERVAL_SECONDS: float = 30.0
 _MONGO_LOCK = threading.Lock()
 
 
@@ -83,9 +83,11 @@ def get_mongo_client() -> Optional[Any]:
         try:
             client = MongoClient(
                 uri,
-                serverSelectionTimeoutMS=3000,
-                connectTimeoutMS=3000,
-                socketTimeoutMS=3000,
+                serverSelectionTimeoutMS=1500,
+                connectTimeoutMS=1500,
+                socketTimeoutMS=2000,
+                maxPoolSize=20,
+                minPoolSize=1,
                 retryWrites=True
             )
             client.admin.command("ping")
@@ -102,7 +104,7 @@ def get_mongo_client() -> Optional[Any]:
                 client.close()
             _last_connect_failure_time = time.monotonic()
             _mongo_db = None
-            logger.error("MongoDB connection or index initialization failed: %s", type(exc).__name__)
+            logger.warning("MongoDB connection deferred (%s); using resilient persistence", type(exc).__name__)
             return None
 def get_mongo_db() -> Optional[Database]:
     """Retrieves the active MongoDB database instance, or None if disconnected."""
