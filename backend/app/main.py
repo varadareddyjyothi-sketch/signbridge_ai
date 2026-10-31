@@ -32,10 +32,11 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS Configuration
+# CORS Configuration - Supports Localhost, LAN IPs (Mobile WiFi), and Cloud Domains
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|.*\.onrender\.com|.*\.vercel\.app|.*\.netlify\.app)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -56,8 +57,15 @@ app.include_router(models.router)
 app.include_router(sentence.router)
 app.include_router(gesture.router)
 
-# Aliases for /api routes
+# Aliases for /api routes so mobile, proxy, and direct /api calls never 404
+app.include_router(auth.router, prefix="/api")
+app.include_router(health.router, prefix="/api")
+app.include_router(predict.router, prefix="/api")
+app.include_router(history.router, prefix="/api")
 app.include_router(dataset.router, prefix="/api")
+app.include_router(vocabulary.router, prefix="/api")
+app.include_router(models.router, prefix="/api")
+app.include_router(sentence.router, prefix="/api")
 
 
 # API Route Prefixes that must NEVER return HTML or SPA fallbacks

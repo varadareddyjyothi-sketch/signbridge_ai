@@ -23,18 +23,30 @@ import type {
 } from '../types';
 
 function resolveApiBase(): string {
+  // 1. Explicitly configured build-time environment variable
   const envUrl = import.meta.env.VITE_API_BASE_URL;
   if (typeof envUrl === 'string' && envUrl.trim().length > 0) {
-    const trimmed = envUrl.trim();
-    return trimmed.replace(/\/+$/, '');
+    return envUrl.trim().replace(/\/+$/, '');
   }
 
-  // Local Vite dev and preview servers use the separate backend on port 8000.
-  if (!import.meta.env.PROD || ['localhost', '127.0.0.1'].includes(window.location.hostname)) {
-    return 'http://localhost:8000';
+  // 2. Runtime configuration via window or localStorage (allows mobile configuration on deployed static sites)
+  if (typeof window !== 'undefined') {
+    const runtimeConfig = (window as any).__SIGNBRIDGE_API_URL__ || localStorage.getItem('signbridge_api_base');
+    if (runtimeConfig && typeof runtimeConfig === 'string' && runtimeConfig.trim()) {
+      return runtimeConfig.trim().replace(/\/+$/, '');
+    }
   }
 
-  // In production: empty string means same-origin relative calls (unified container or reverse proxy)
+  // 3. Localhost or local network IP (e.g. accessing from mobile device via WiFi 192.168.x.x:5173 or 10.x.x.x:5173)
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    // If running on Vite dev/preview server (port 5173, 5174, 3000), target backend port 8000 on the same host/IP
+    if (window.location.port === '5173' || window.location.port === '5174' || window.location.port === '3000') {
+      return `${window.location.protocol}//${hostname}:8000`;
+    }
+  }
+
+  // 4. Same-origin relative calls (unified container or reverse proxy on Render, Railway, Docker)
   return '';
 }
 
@@ -446,6 +458,12 @@ export const api = {
       })
     });
     if (!res.ok) {
+      if (res.status === 404) {
+        if (!API_BASE && isKnownStaticHostingDomain()) {
+          throw new Error('SignBridge backend API URL is not configured for this static deployment. Please set VITE_API_BASE_URL to your backend URL.');
+        }
+        throw new Error('Registration endpoint not found (HTTP 404). Please ensure the backend server is online.');
+      }
       const err = await res.json().catch(() => ({ detail: `Registration failed (HTTP ${res.status})` }));
       throw new Error(formatApiError(err.detail, `Registration failed (HTTP ${res.status})`));
     }
@@ -465,6 +483,12 @@ export const api = {
       body: JSON.stringify({ email, password })
     });
     if (!res.ok) {
+      if (res.status === 404) {
+        if (!API_BASE && isKnownStaticHostingDomain()) {
+          throw new Error('SignBridge backend API URL is not configured for this static deployment. Please set VITE_API_BASE_URL to your backend URL.');
+        }
+        throw new Error('Authentication endpoint not found (HTTP 404). Please ensure the backend server is online.');
+      }
       const err = await res.json().catch(() => ({ detail: `Login failed (HTTP ${res.status})` }));
       throw new Error(formatApiError(err.detail, `Login failed (HTTP ${res.status})`));
     }
