@@ -23,10 +23,16 @@ import type {
 } from '../types';
 
 function resolveApiBase(): string {
+  const isLocalDevice = typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname);
+
   // 1. Explicitly configured build-time environment variable
   const envUrl = import.meta.env.VITE_API_BASE_URL;
   if (typeof envUrl === 'string' && envUrl.trim().length > 0) {
-    return envUrl.trim().replace(/\/+$/, '');
+    const trimmed = envUrl.trim().replace(/\/+$/, '');
+    // Ignore localhost dev URLs if running on a real mobile device, remote IP, or cloud host
+    if (isLocalDevice || (!trimmed.includes('localhost') && !trimmed.includes('127.0.0.1'))) {
+      return trimmed;
+    }
   }
 
   // 2. Runtime configuration via window or localStorage (allows mobile configuration on deployed static sites)
@@ -37,7 +43,7 @@ function resolveApiBase(): string {
     }
   }
 
-  // 3. Localhost or local network IP (e.g. accessing from mobile device via WiFi 192.168.x.x:5173 or 10.x.x.x:5173)
+  // 3. Local network IP or dev server (e.g. accessing from mobile device via WiFi 192.168.x.x:5173 or 10.x.x.x:5173)
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
     // If running on Vite dev/preview server (port 5173, 5174, 3000), target backend port 8000 on the same host/IP
