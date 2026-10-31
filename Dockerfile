@@ -35,6 +35,7 @@ COPY ml/ ./ml/
 
 # Copy built frontend distribution into static serving directory
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
+COPY --from=frontend-builder /app/frontend/dist ./dist
 
 # Production Environment Settings
 ENV PORT=8000 \
@@ -42,7 +43,7 @@ ENV PORT=8000 \
     ENVIRONMENT=production \
     PYTHONUNBUFFERED=1
 
-EXPOSE 8000
+EXPOSE 8000 8080 3000
 
 # Start Uvicorn bound to DeployXa / Cloud PORT
 CMD ["sh", "-c", "uvicorn backend.app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

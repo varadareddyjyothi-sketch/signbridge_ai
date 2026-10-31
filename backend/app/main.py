@@ -36,7 +36,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
-    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|.*\.onrender\.com|.*\.vercel\.app|.*\.netlify\.app)(:\d+)?$",
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|.*\.onrender\.com|.*\.vercel\.app|.*\.netlify\.app|.*\.deployxa\.online|.*\.deployxa\.com)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -137,10 +137,18 @@ async def root(request: Request):
     or returns API metadata JSON when requested by API clients / tests.
     """
     index_path = os.path.join(settings.STATIC_DIR, "index.html")
+    if not os.path.isfile(index_path):
+        for candidate in [os.path.join(str(settings.BASE_DIR), "dist", "index.html"), "/app/dist/index.html"]:
+            if os.path.isfile(candidate):
+                index_path = candidate
+                break
+
     accept = request.headers.get("accept", "")
+    sec_dest = request.headers.get("sec-fetch-dest", "")
+    is_browser_nav = "text/html" in accept or sec_dest == "document"
     
-    # If frontend build exists and browser specifically requests HTML navigation
-    if os.path.isfile(index_path) and "text/html" in accept and "application/json" not in accept:
+    # If frontend build exists and request is browser navigation
+    if os.path.isfile(index_path) and is_browser_nav and "application/json" not in accept:
         return FileResponse(index_path, headers={"Cache-Control": "no-cache"})
 
     return {

@@ -11,6 +11,20 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 
+def _resolve_static_dir(base_dir: Path) -> str:
+    """Finds the production frontend build directory across local dev, monorepos, and Docker."""
+    candidates = [
+        base_dir / "frontend" / "dist",
+        base_dir / "dist",
+        Path("/app/frontend/dist"),
+        Path("/app/dist")
+    ]
+    for c in candidates:
+        if (c / "index.html").is_file():
+            return str(c)
+    return str(base_dir / "frontend" / "dist")
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
@@ -20,7 +34,7 @@ class Settings(BaseSettings):
     DEBUG: bool = os.getenv("ENVIRONMENT", "development") != "production"
 
     # Server settings - default to 0.0.0.0 in production/cloud environments
-    HOST: str = os.getenv("HOST", "0.0.0.0" if os.getenv("ENVIRONMENT") == "production" else "127.0.0.1")
+    HOST: str = os.getenv("HOST", "0.0.0.0")
     PORT: int = int(os.getenv("PORT", "8000"))
 
     # Configure the exact browser origins in production. Development loopback
@@ -46,7 +60,7 @@ class Settings(BaseSettings):
     SQLITE_DB_PATH: str = str(BASE_DIR / "backend" / "app" / "database" / "signbridge_local.db")
 
     # Static Assets Directory (Frontend Build)
-    STATIC_DIR: str = str(BASE_DIR / "frontend" / "dist")
+    STATIC_DIR: str = _resolve_static_dir(BASE_DIR)
 
     @property
     def cors_origins(self) -> List[str]:
